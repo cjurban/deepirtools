@@ -208,7 +208,7 @@ class MIRTVAEClass(BaseClass):
                         iw_samples):
         # Compute cross-entropy (i.e., log p(x | z)).
         idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
-        cross_entropy = -(torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1) + EPS).log().sum(dim = -1, keepdim = True)
+        cross_entropy = -torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
         
         # Compute log p(z).
         log_pz = (-0.5 * z.pow(2) - math.log(math.sqrt(2 * math.pi))).sum(dim = -1, keepdim = True)
