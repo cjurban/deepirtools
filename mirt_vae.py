@@ -10,7 +10,6 @@ import torch
 from torch import nn, optim
 import torch.nn.functional as F
 import torch.distributions as dist
-from scipy.linalg import block_diag
 from utils import *
 from helper_layers import *
 from base_class import BaseClass
@@ -21,7 +20,9 @@ import matplotlib.backends.backend_pdf
 from factor_analyzer import Rotator
 from pylab import *
 
-EPS = 1e-8
+
+EPS = 1e-7
+
     
 # Variational autoencoder for MIRT module.
 class MIRTVAE(nn.Module):
@@ -57,74 +58,73 @@ class MIRTVAE(nn.Module):
                 for k in range(len(self.inf_dims) - 1):
                     inf_list.append(nn.Linear(self.inf_dims[k], self.inf_dims[k + 1]))
                     inf_list.append(nn.ELU())
+            inf_list.append(nn.Linear(self.inf_dims[len(self.inf_dims) - 1], 
+                                      self.latent_dim + self.latent_dim))
             self.inf = nn.Sequential(*inf_list)
-            self.mu = nn.Linear(self.inf_dims[len(self.inf_dims) - 1], self.latent_dim)
-            self.logstd = nn.Linear(self.inf_dims[len(self.inf_dims) - 1], self.latent_dim)
         else:
-            self.mu = nn.Linear(self.input_dim, self.latent_dim)
-            self.logstd = nn.Linear(self.input_dim, self.latent_dim)
+            self.inf = nn.Linear(self.inf_dims[len(self.inf_dims) - 1], 
+                                 self.latent_dim + self.latent_dim)
         
         # Define loadings matrix.
         self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
         nn.init.xavier_uniform_(self.loadings.weight)
         
         # Define intercept vector.
-        self.intercepts = Bias(torch.from_numpy(np.hstack([logistic_thresholds(n_cat) for n_cat in n_cats])))
+        self.intercepts = CatBiasReshape(self.n_cats, self.device)
         
-        # Define block diagonal matrix.
-        ones = [np.ones((n_cat - 1, 1)) for n_cat in n_cats]
-        self.D = torch.from_numpy(block_diag(*ones)).to(self.device).float()
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        nn.init.normal_(self.inf[-1].weight, mean=0., std=0.001)
+        nn.init.normal_(self.inf[-1].bias[0:self.latent_dim], mean=0., std=0.001)
+        nn.init.normal_(self.inf[-1].bias[self.latent_dim:], mean=math.log(math.exp(1) - 1), std=0.001)
 
     def encode(self,
                x,
                mc_samples,
                iw_samples):
-        if self.inf_dims != []:
-            hidden = self.inf(x)
-        else:
-            hidden = x
+        hidden = self.inf(x)
 
-        # Expand Tensors for Monte Carlo samples.
-        mu = self.mu(hidden).unsqueeze(0).expand(mc_samples, hidden.size(0), self.latent_dim)
-        logstd = self.logstd(hidden).unsqueeze(0).expand(mc_samples, hidden.size(0), self.latent_dim)
+        # Expand for Monte Carlo samples.
+        hidden = hidden.unsqueeze(0).expand(torch.Size([mc_samples]) + hidden.shape)
         
-        # Expand Tensors for importance-weighted samples.
-        mu = mu.unsqueeze(0).expand(torch.Size([iw_samples]) + mu.shape)
-        logstd = logstd.unsqueeze(0).expand(torch.Size([iw_samples]) + logstd.shape)
+        # Expand for importance-weighted samples.
+        hidden = hidden.unsqueeze(0).expand(torch.Size([iw_samples]) + hidden.shape)
+        
+        mu, std = hidden.chunk(chunks = 2, dim = -1)
+        std = F.softplus(std)
             
-        return mu, logstd.clamp(min = np.log(EPS), max = -np.log(EPS))
+        return mu, std + EPS
 
     def reparameterize(self,
                        mu,
-                       logstd):
+                       std):
         # Impute factor scores.
-        qz_x = dist.Normal(mu, logstd.exp())
+        z = mu + std * torch.randn_like(mu)
 
-        return qz_x.rsample()
+        return z
         
     def decode(self,
                z):
-        # Compute cumulative probabilities.
-        cum_probs = self.intercepts(F.linear(self.loadings(z), self.D)).sigmoid()
+        Bz = self.loadings(z)
+        cum_probs = self.intercepts(Bz.unsqueeze(-1).expand(Bz.shape +
+                                                                 torch.Size([max(self.n_cats) - 1]))).sigmoid()
+        upper_probs = F.pad(cum_probs, (0, 1), value=1.)
+        lower_probs = F.pad(cum_probs, (1, 0), value=0.)
+        probs = upper_probs - lower_probs
         
-        # Set up subtraction of adjacent cumulative probabilities.
-        one_idxs = np.cumsum(self.n_cats) - 1
-        zero_idxs = one_idxs - (np.asarray(self.n_cats) - 1)
-        upper_probs = torch.ones(cum_probs.shape[:-1] + torch.Size([cum_probs.size(-1) + len(self.n_cats)])).to(self.device)
-        lower_probs = torch.zeros(cum_probs.shape[:-1] + torch.Size([cum_probs.size(-1) + len(self.n_cats)])).to(self.device)
-        upper_probs[..., torch.from_numpy(np.delete(np.arange(0, upper_probs.size(-1), 1), one_idxs))] = cum_probs
-        lower_probs[..., torch.from_numpy(np.delete(np.arange(0, lower_probs.size(-1), 1), zero_idxs))] = cum_probs
-        
-        return (upper_probs - lower_probs).clamp(min = EPS, max = 1 - EPS)
+        return probs
 
     def forward(self,
                 x,
                 mc_samples = 1,
                 iw_samples = 1):
-        mu, logstd = self.encode(x, mc_samples, iw_samples)
-        z = self.reparameterize(mu, logstd)
+        mu, std = self.encode(x, mc_samples, iw_samples)
+        z = self.reparameterize(mu, std)
+        recon_x = self.decode(z)
         
-        return self.decode(z), mu, logstd, z
+        return recon_x, mu, std, z
+    
     
 # Variational autoencoder for exploratory IFA instance class.
 class MIRTVAEClass(BaseClass):
@@ -202,25 +202,24 @@ class MIRTVAEClass(BaseClass):
                         x,
                         recon_x,
                         mu,
-                        logstd,
+                        std,
                         z,
                         mc_samples,
                         iw_samples):
-        # Give batch same dimensions as reconstructed batch.
-        x = x.expand(recon_x.shape)
-        
         # Compute cross-entropy (i.e., log p(x | z)).
-        cross_entropy = (-x * recon_x.log()).sum(dim = -1, keepdim = True)
+        idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
+        cross_entropy = -(torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1) + EPS).log().sum(dim = -1, keepdim = True)
         
         # Compute log p(z).
-        log_pz = dist.Normal(torch.zeros_like(z).to(self.device),
-                             torch.ones_like(z).to(self.device)).log_prob(z).sum(-1, keepdim = True)
+        log_pz = (-0.5 * z.pow(2) - math.log(math.sqrt(2 * math.pi))).sum(dim = -1, keepdim = True)
             
         # Compute log q(z | x).
-        qz_x = dist.Normal(mu, logstd.exp())
-        (qz_x_) = (qz_x.__class__(qz_x.loc.detach(), qz_x.scale.detach()) if self.model.training and
-                   iw_samples > 1 and self.grad_estimator == "dreg" else (qz_x))
-        log_qz_x = qz_x_.log_prob(z).sum(-1, keepdim = True)
+        if self.model.training and iw_samples > 1 and self.grad_estimator == "dreg":
+            mu_, std_ = mu.detach(), std.detach()
+            qz_x = dist.Normal(mu_, std_)
+        else:
+            qz_x = dist.Normal(mu, std)
+        log_qz_x = qz_x.log_prob(z).sum(dim = -1, keepdim = True)
         
         # Compute KL divergence.
         kld = log_qz_x - log_pz
@@ -237,12 +236,12 @@ class MIRTVAEClass(BaseClass):
                        x,
                        recon_x,
                        mu,
-                       logstd,
+                       std,
                        z,
                        mc_samples,
                        iw_samples):
         # Compute ELBO components.
-        cross_entropy, kld, annealed_kld = self.elbo_components(x, recon_x, mu, logstd, z, mc_samples, iw_samples)
+        cross_entropy, kld, annealed_kld = self.elbo_components(x, recon_x, mu, std, z, mc_samples, iw_samples)
         elbo = cross_entropy + annealed_kld
         
         if iw_samples == 1:
@@ -339,26 +338,6 @@ class MIRTVAEClass(BaseClass):
         
         self.model.train()                                    
         return torch.cat(scores_ls, dim = 0)
-
-    # Print results.
-    def print_function(self,
-                       batch_loader,
-                       loss,
-                       epoch = None,
-                       batch = None,
-                       batch_idx = None,
-                       train_loader = None):
-        if self.model.training and train_loader is None:
-            print("Train epoch: {} [{}/{} ({:.0f}%)]\tBatch loss: {:.2f}".format(
-                  epoch, batch_idx * len(batch), len(batch_loader.dataset),
-                  100. * batch_idx / len(batch_loader), loss.item()))
-        elif self.model.training and train_loader is not None:
-            print("Train epoch: {} [{}/{} ({:.0f}%)]\tVal. loss: {:.2f}".format(
-                  epoch, batch_idx * len(batch), len(train_loader.dataset),
-                  100. * batch_idx / len(train_loader), loss))
-        elif not self.model.training:
-            N = len(batch_loader.dataset)
-            print("====> Test loss: {:.2f}".format(loss / N))
             
             
 def screeplot(latent_dims, # list of dimensions in ascending order
@@ -431,8 +410,6 @@ def screeplot(latent_dims, # list of dimensions in ascending order
     pdf.savefig(fig, dpi = 300)
     pdf.close()
     return ll_ls
-
-
 
 def get_rotated_loadings(loadings, method):
     start = timeit.default_timer()

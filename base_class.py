@@ -12,6 +12,7 @@ import torch
 import numpy as np
 import os
 
+
 # The base class.
 class BaseClass():
 
@@ -23,7 +24,7 @@ class BaseClass():
                  device,
                  log_interval,
                  steps_anneal = 0,
-                 verbose = False):
+                 verbose = True):
         """
         Args:
             input_dim            (int): Input vector dimension.
@@ -43,21 +44,18 @@ class BaseClass():
         self.log_interval = log_interval
         self.steps_anneal = steps_anneal
         self.verbose = verbose
-        
+
         self.global_iter = 0 # Keeps track of number of fitting iterations (i.e., batches).
+        self.converged = False
         self.loss_list = [] # List to mointor loss over batches.
         self.best_avg_loss = None # Keeps track of best average loss.
         self.loss_improvement_counter = 0 # Keeps track of number of iterations since average loss has not improved.
-        self.converged = False
         
         # To be implemented by subclasses.
         self.model = None
         self.optimizer = None
 
     def loss_function(self):
-        raise NotImplementedError
-
-    def print_function(self):
         raise NotImplementedError
 
     # A single fitting iteration.
@@ -77,6 +75,39 @@ class BaseClass():
 
         return loss
 
+    # Check whether model has converged.
+    def check_convergence(self,
+                          loss,
+                          epoch):
+        cur_mean_loss = None
+        
+#        # Append to loss list.
+        self.loss_list.append(loss.item())
+        if len(self.loss_list) > 100:
+            self.loss_list.pop(0)
+            
+        # Determine whether to terminate fitting.
+        if (self.global_iter - 1) % 100 == 0 and self.global_iter != 1:
+            cur_mean_loss = np.mean(self.loss_list)
+
+            if self.best_avg_loss is None:
+                self.best_avg_loss = cur_mean_loss
+            elif cur_mean_loss < self.best_avg_loss:
+                self.best_avg_loss = cur_mean_loss
+                if self.loss_improvement_counter >= 1:
+                    self.loss_improvement_counter = 0
+            elif cur_mean_loss >= self.best_avg_loss:
+                self.loss_improvement_counter += 1
+                if self.loss_improvement_counter >= 100:
+                    self.converged = True
+            if (self.global_iter - 1) % self.log_interval == 0:
+                if self.verbose:
+                    print("Epoch = {:7d}".format(epoch),
+                          "Iter. = {:6d}".format(self.global_iter),
+                          "  Current mean loss = {:5.2f}".format(cur_mean_loss),
+                          "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
+                          end = "\r")
+    
     # Fit for one epoch.
     def train(self,
               train_loader,
@@ -101,36 +132,8 @@ class BaseClass():
                     self.converged = True
                     break
                     
-                # Append to loss list.
                 if self.global_iter >= self.steps_anneal:
-                    self.loss_list.append(loss.item())
-                    if len(self.loss_list) > 100:
-                        self.loss_list.pop(0)
-
-                    # Determine whether to terminate fitting.
-                    if (self.global_iter - 1) % 100 == 0 and self.global_iter != 1:
-                        cur_mean_loss = np.mean(self.loss_list)
-
-                        if self.best_avg_loss is None:
-                            self.best_avg_loss = cur_mean_loss
-                        elif cur_mean_loss < self.best_avg_loss:
-                            self.best_avg_loss = cur_mean_loss
-                            if self.loss_improvement_counter >= 1:
-                                self.loss_improvement_counter = 0
-                        elif cur_mean_loss >= self.best_avg_loss:
-                            self.loss_improvement_counter += 1
-                            if self.loss_improvement_counter >= 100:
-                                self.converged = True
-
-                if (self.global_iter - 1) % self.log_interval == 0:
-                    if self.verbose:
-                        try:
-                            self.print_function(eval_loader, eval_loss, epoch = epoch,
-                                                batch = data, batch_idx = batch_idx, train_loader = train_loader)
-                        except UnboundLocalError:
-                            self.print_function(train_loader, loss, epoch = epoch,
-                                                batch = data, batch_idx = batch_idx)
-
+                    self.check_convergence(loss, epoch)
             else:
                 break
 
@@ -138,8 +141,7 @@ class BaseClass():
     def test(self,
              eval_loader,
              mc_samples,
-             iw_samples,
-             print_result = True):
+             iw_samples):
         # Switch to evaluation mode.
         self.model.eval()
         eval_loss = 0
@@ -150,12 +152,8 @@ class BaseClass():
                 loss = self.step(data, mc_samples, iw_samples)
                 eval_loss += loss.item()
         
-        if print_result:
-            self.print_function(eval_loader, eval_loss)
-            self.model.train()
-        else:
-            self.model.train()
-            return eval_loss
+        self.model.train()
+        return eval_loss
 
     # Fit the model.
     def run_training(self,
@@ -165,12 +163,14 @@ class BaseClass():
                      mc_samples = 1,
                      iw_samples = 1,
                      log_likelihood = False):
-        for epoch in range(max_epochs):
-            if not self.converged:
-                self.train(train_loader, eval_loader, epoch, mc_samples, iw_samples)
-
-                if self.verbose:
-                    self.test(eval_loader, mc_samples, iw_samples)
+        epoch = 0
+        while not self.converged:
+            self.train(train_loader, eval_loader, epoch, mc_samples, iw_samples)
+                
+            epoch += 1
+            if epoch == max_epochs and not self.converged:
+                print("Failed to converge within " + str(max_epochs) + " epochs.")
+                break
 
     # Save the model.
     def save_model(self,
