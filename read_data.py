@@ -14,13 +14,14 @@ import numpy as np
 import random
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
     
 # Read in a data set from a CSV file.
 class csv_dataset(Dataset):
     def __init__(self,
-                 csv_file,
+                 #csv_file,
+                 data,
                  which_split,
                  csv_header = 0,
                  categories = None,
@@ -44,36 +45,7 @@ class csv_dataset(Dataset):
         """
         self.which_split = which_split
         self.transform = to_tensor()
-
-        csv_data = pd.read_csv(csv_file, sep = ",", header = csv_header)
-        
-        if self.which_split == "full":
-            self.df = csv_data
-            
-        elif self.which_split == "train-only" or self.which_split == "test-only":
-            # Split the data into a training set and a test set.
-            csv_train, csv_test = train_test_split(csv_data, train_size = 1 - test_size, test_size = test_size, random_state = 45)
-            
-            if self.which_split == "train-only":
-                self.df = csv_train
-            elif self.which_split == "test-only":
-                self.df = csv_test
-            
-        else:
-            # Split the data into a training set, a validation set, and a test set.
-            csv_train, csv_test = train_test_split(csv_data, train_size = 1 - test_size, test_size = test_size, random_state = 45)
-            csv_train, csv_val = train_test_split(csv_train, train_size = 1 - val_size, test_size = val_size, random_state = 50)
-
-            if self.which_split == "train":
-                self.df = csv_train
-            elif self.which_split == "val":
-                self.df = csv_val
-            elif self.which_split == "test":
-                self.df = csv_test
-        
-        # Convert the integer data into one hot encoded data
-        enc = OneHotEncoder(categories = categories)
-        self.df = enc.fit_transform(self.df).toarray()
+        self.df = data
         
     
     def __len__(self):
@@ -82,13 +54,15 @@ class csv_dataset(Dataset):
     def __getitem__(self, idx):
         # data is formatted as an numpy array: 
         # sample = self.df.iloc[idx, :].to_numpy()
-        sample = self.df[idx, :]
+        sample = self.df.iloc[idx, :].to_numpy()
         if self.transform:
             sample = self.transform(sample)
 
         return sample
+    
     def num_columns(self):
         return self.df.shape[1]
+    
 # Convert Numpy arrays in sample to Tensors.
 class to_tensor(object):
     def __call__(self, sample):

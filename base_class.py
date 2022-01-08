@@ -11,6 +11,9 @@ from __future__ import print_function
 import torch
 import numpy as np
 import os
+from sklearn.preprocessing import OneHotEncoder
+from read_data import csv_dataset
+import pandas as pd
 
 
 # The base class.
@@ -81,7 +84,7 @@ class BaseClass():
                           epoch):
         cur_mean_loss = None
         
-#        # Append to loss list.
+        # Append to loss list.
         self.loss_list.append(loss.item())
         if len(self.loss_list) > 100:
             self.loss_list.pop(0)
@@ -157,20 +160,42 @@ class BaseClass():
 
     # Fit the model.
     def run_training(self,
-                     train_loader,
-                     eval_loader,
+                     data,
+                     categories,
+                     eval_prop = .9,
                      max_epochs = 3000,
                      mc_samples = 1,
                      iw_samples = 1,
                      log_likelihood = False):
+
+        data = pd.DataFrame(data)
+
+        train_loader =  torch.utils.data.DataLoader(
+                csv_dataset(data = data,
+                which_split = "full",
+                csv_header = None,
+                categories = categories),
+                #batch_size = 32, shuffle = True, **kwargs)
+                batch_size = 32, shuffle = True)
+        
+        eval_loader = torch.utils.data.DataLoader(
+                csv_dataset(data = data,
+                which_split = "test-only",
+                test_size = eval_prop,
+                csv_header = None,
+                categories = categories),
+                #batch_size = 32, shuffle = True, **kwargs)
+                batch_size = 32, shuffle = True)
+        
         epoch = 0
         while not self.converged:
             self.train(train_loader, eval_loader, epoch, mc_samples, iw_samples)
-                
+
             epoch += 1
             if epoch == max_epochs and not self.converged:
                 print("Failed to converge within " + str(max_epochs) + " epochs.")
                 break
+                
 
     # Save the model.
     def save_model(self,
@@ -185,3 +210,5 @@ class BaseClass():
                    model_name,
                    load_path):
         self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth"))
+ 
+        

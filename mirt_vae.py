@@ -13,12 +13,16 @@ import torch.distributions as dist
 from utils import *
 from helper_layers import *
 from base_class import BaseClass
+from read_data import csv_dataset
 import timeit
 
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 from factor_analyzer import Rotator
 from pylab import *
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+import pandas as pd
 
 
 EPS = 1e-7
@@ -160,7 +164,7 @@ class MIRTVAEClass(BaseClass):
                                     lr = self.lr,
                                     amsgrad = True)
         
-                 
+                
     # Compute loss for one batch.
     def loss_function(self,
                       x,
@@ -188,11 +192,12 @@ class MIRTVAEClass(BaseClass):
             self.optimizer.step()
 
         return loss
-    
+    @property
     # Return unrotated loadings
     def get_unrotated_loadings(self):
         return self.model.loadings.weight.data.numpy()
     
+    @property
     # Return intercepts
     def get_intercepts(self):
         return self.model.intercepts.bias.data.numpy()
@@ -274,9 +279,16 @@ class MIRTVAEClass(BaseClass):
         
     # Compute pseudo-BIC.
     def bic(self,
-            eval_loader,
-            iw_samples = 1):
-        print("\nComputing approx. LL")
+            csv_test,
+            iw_samples = 1,
+            data_loader_kwargs = {}):
+        eval_loader = torch.utils.data.DataLoader(
+        csv_dataset(data = csv_test.reset_index(drop = True), 
+                    which_split = "full"),
+        batch_size = 32, shuffle = True, **data_loader_kwargs)
+        print(eval_loader.dataset.df.head())
+    
+        print("\nComputing approx. LL", end="")
         start = timeit.default_timer()
         # Get size of data set.
         N = len(eval_loader.dataset)
@@ -288,8 +300,7 @@ class MIRTVAEClass(BaseClass):
         # Approximate marginal log-likelihood.
         ll = self.test(eval_loader,
                        mc_samples =  1,
-                       iw_samples = iw_samples,
-                       print_result = False)
+                       iw_samples = iw_samples)
         
         # Switch back to previous bound.
         self.grad_estimator = old_estimator
@@ -300,7 +311,7 @@ class MIRTVAEClass(BaseClass):
         # Compute BIC.
         bic = 2 * ll + np.log(N) * n_params
         stop = timeit.default_timer()
-        print("Approx. LL computed in", round(stop - start, 2), "seconds")
+        print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
 
         return bic, -ll, n_params
     
@@ -341,9 +352,14 @@ class MIRTVAEClass(BaseClass):
             
             
 def screeplot(latent_dims, # list of dimensions in ascending order
+                            csv_data,
+                            categories,
                             n_cats, 
-                            ipip_train_loader, 
-                            ipip_test_loader,
+                            #ipip_train_loader, 
+                            #ipip_test_loader,
+                            which_split, 
+                            test_size,
+                            data_loader_kwargs = {},
                             learning_rate = 5e-3,
                             device = "cpu",
                             log_interval = 100,
@@ -355,9 +371,19 @@ def screeplot(latent_dims, # list of dimensions in ascending order
                             title = "Approximate Log-Likelihood Scree Plot"):
     seed = 1
     ll_ls = []
+    
+    csv_train, csv_test = train_test_split(csv_data, train_size = 1 - test_size, test_size = test_size, random_state = 45)
+    
+    #enc = OneHotEncoder(categories = categories)
+    #csv_test = enc.fit_transform(csv_test).toarray()
+    csv_test = pd.DataFrame(csv_test)
+            
+    
+    
+    
     for latent_dim in latent_dims:
 
-        print("\nStarting fitting for P =", latent_dim)
+        print("\rStarting fitting for P =", latent_dim, end="")
 
         # Set random seeds.
         torch.manual_seed(seed)
@@ -365,8 +391,9 @@ def screeplot(latent_dims, # list of dimensions in ascending order
 
         # Initialize model.
         start = timeit.default_timer()
-        ipip_vae = MIRTVAEClass(input_dim = ipip_train_loader.dataset.num_columns(),
-                                inference_model_dims = [int(np.ceil(ipip_train_loader.dataset.num_columns()/2))], # adjust NN size for different P
+
+        ipip_vae = MIRTVAEClass(input_dim = csv_data.shape[1],
+                                inference_model_dims = [int(np.ceil(csv_data.shape[1]/2))], # adjust NN size for different P
                                 latent_dim = latent_dim,
                                 n_cats = n_cats,
                                 learning_rate = learning_rate,
@@ -375,19 +402,21 @@ def screeplot(latent_dims, # list of dimensions in ascending order
                                 steps_anneal = steps_anneal)
 
         # Fit model.
-        ipip_vae.run_training(ipip_train_loader, ipip_test_loader, iw_samples = iw_samples_training)
+        # run training on training set
+        print(type(csv_data))
+        ipip_vae.run_training(csv_data, categories, iw_samples = iw_samples_training)
         stop = timeit.default_timer()
 
-        print("Model fitted, run time =", round(stop - start, 2), "seconds")
+        print("\rModel fitted for P =", latent_dim, ", run time =", round(stop - start, 2), "seconds", end = "")
 
         # Save predicted approximate negative log-likelihood.
         torch.manual_seed(seed)
         np.random.seed(seed)
         start = timeit.default_timer()
-        ll_ls.append(-ipip_vae.bic(ipip_test_loader, iw_samples = iw_samples_bic)[1]) # I set iw_samples = 5000 in the paper
+        ll_ls.append(-ipip_vae.bic(csv_test, iw_samples = iw_samples_bic)[1]) # I set iw_samples = 5000 in the paper
         stop = timeit.default_timer()
 
-        print("Approx. LL stored, computed in", round(stop - start, 2), "seconds")
+        # print("Approx. LL stored, computed in", round(stop - start, 2), "seconds", end="")
 
     print("\n")
     for idx, dim in enumerate(latent_dims):
@@ -417,7 +446,8 @@ def get_rotated_loadings(loadings, method):
     rot_loadings = rotator.fit_transform(loadings)
     
     stop = timeit.default_timer()
-    print("Rotated loadings computed in", round(stop - start, 2), "seconds")
+    print("\rRotated loadings computed in", round(stop - start, 2), "seconds", end = "")
+    sys.stdout.flush()
     return rot_loadings, rotator.phi_
 
     
