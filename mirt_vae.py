@@ -35,7 +35,10 @@ class MIRTVAE(nn.Module):
                  input_dim,
                  inference_model_dims,
                  latent_dim,
-                 n_cats,
+                 Q,
+                 A,
+                 b,
+                 correlated_factors,
                  device):
         """
         Args:
@@ -70,11 +73,20 @@ class MIRTVAE(nn.Module):
                                  self.latent_dim + self.latent_dim)
         
         # Define loadings matrix.
-        self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
-        nn.init.xavier_uniform_(self.loadings.weight)
+        if Q is not None:
+            self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
+            init_sparse_xavier_uniform_(self.loadings.weight, Q)
+        elif self.A is not None:
+            self.loadings = LinearConstraints(self.latent_dim, len(self.n_cats), self.A, self.b)
+        else:
+            self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
+            nn.init.xavier_uniform_(self.loadings.weight)
         
         # Define intercept vector.
         self.intercepts = CatBiasReshape(self.n_cats, self.device)
+        
+        # Define Cholesky decomposition of factor covariance matrix.
+        self.cholesky = Spherical(self.latent_dim, self.correlated_factors, self.device)
         
         self.reset_parameters()
         
@@ -142,6 +154,10 @@ class MIRTVAEClass(BaseClass):
                  device,
                  log_interval,
                  gradient_estimator = "dreg",
+                 Q = None,
+                 A = None,
+                 b = None,
+                 correlated_factors = [],
                  steps_anneal = 0,
                  verbose = False):
         """
@@ -149,17 +165,27 @@ class MIRTVAEClass(BaseClass):
             n_cats             (list of int): List containing number of categories for each observed variable.
             gradient_estimator (str): Inference model gradient estimator.
                                       "iwae" = IWAE, "dreg" = DReG.
+            Q                     (Tensor): Matrix with binary entries indicating measurement structure.
+            A                     (Tensor): Matrix implementing linear constraints.
+            b                     (Tensor): Vector implementing linear constraints.
+            correlated_factors    correlated_factors    (list of int): List of correlated factors.
         """
         super().__init__(input_dim, inference_model_dims, latent_dim, learning_rate,
                          device, log_interval, steps_anneal, verbose)
         
         self.n_cats = n_cats
         self.grad_estimator = gradient_estimator
+        self.correlated_factors = correlated_factors
+        self.inf_grad_estimator = inf_grad_estimator
         self.model = MIRTVAE(input_dim = self.input_dim,
                              inference_model_dims = self.inf_dims,
                              latent_dim = self.latent_dim,
                              n_cats = self.n_cats,
-                             device = self.device).to(self.device)
+                             Q = self.Q,
+                             A = self.A,
+                             b = self.b,
+                             device = self.device,
+                             correlated_factors = self.correlated_factors).to(self.device)
         self.optimizer = optim.Adam([{"params" : self.model.parameters()}],
                                     lr = self.lr,
                                     amsgrad = True)
@@ -170,11 +196,68 @@ class MIRTVAEClass(BaseClass):
                       x,
                       recon_x,
                       mu,
-                      logstd,
+                      std,
                       z,
                       mc_samples,
                       iw_samples):
-        return self.log_likelihood(x, recon_x, mu, logstd, z, mc_samples, iw_samples)
+        # Compute log p(x | z).
+        idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
+        log_px_z = -(torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
+        
+        # Compute log p(z).
+        if self.correlated_factors != []:
+            log_pz = dist.MultivariateNormal(torch.zeros_like(z).to(self.device),
+                                             scale_tril = self.model.cholesky.weight).log_prob(z).unsqueeze(-1)
+            
+        else:
+            log_pz = dist.Normal(torch.zeros_like(z).to(self.device),
+                                 torch.ones_like(z).to(self.device)).log_prob(z).sum(-1, keepdim = True)
+            
+        # Compute log q(z | x).
+        if self.model.training and iw_samples > 1 and self.inf_grad_estimator == "dreg":
+            mu_, std_ = mu.detach(), std.detach()
+            qz_x = dist.Normal(mu_, std_)
+        else:
+            qz_x = dist.Normal(mu, std)
+        log_qz_x = qz_x.log_prob(z).sum(dim = -1, keepdim = True)
+        
+        # Compute ELBO with annealed KL divergence.
+        anneal_reg = (linear_annealing(0, 1, self.global_iter, self.steps_anneal)
+                      if self.model.training else 1)
+        elbo = log_px_z + anneal_reg * (log_qz_x - log_pz)
+        
+        # Compute ELBO.
+        if iw_samples == 1:
+            elbo = elbo.squeeze(0).mean(0)
+            if self.model.training:
+                return elbo.mean()
+            else:
+                return elbo.sum()
+
+        # Compute IW-ELBO.
+        elif self.inf_grad_estimator == "iwae":
+            elbo *= -1
+            iw_elbo = math.log(elbo.size(0)) - elbo.logsumexp(dim = 0)
+                    
+            if self.model.training:
+                return iw_elbo.mean()
+            else:
+                return iw_elbo.mean(0).sum()
+
+        # Compute IW-ELBO with DReG estimator.
+        elif self.inf_grad_estimator == "dreg":
+            elbo *= -1
+            with torch.no_grad():
+                # Compute normalized importance weights.
+                w_tilda = (elbo - elbo.logsumexp(dim = 0)).exp()
+                
+                if z.requires_grad:
+                    z.register_hook(lambda grad: w_tilda * grad)
+            
+            if self.model.training:
+                return (-w_tilda * elbo).sum(0).mean()
+            else:
+                return (-w_tilda * elbo).sum()
         
     # Fit for one epoch.
     def step(self,
@@ -190,8 +273,13 @@ class MIRTVAEClass(BaseClass):
         if self.model.training and not torch.isnan(loss):
             loss.backward()
             self.optimizer.step()
+            
+            # Set fixed loadings to zero.
+            if self.model.Q is not None:
+                self.model.loadings.weight.data.mul_(self.model.Q)
 
         return loss
+    
     @property
     # Return unrotated loadings
     def get_unrotated_loadings(self):
@@ -201,81 +289,6 @@ class MIRTVAEClass(BaseClass):
     # Return intercepts
     def get_intercepts(self):
         return self.model.intercepts.bias.data.numpy()
-    
-    # Compute ELBO components.
-    def elbo_components(self,
-                        x,
-                        recon_x,
-                        mu,
-                        std,
-                        z,
-                        mc_samples,
-                        iw_samples):
-        # Compute cross-entropy (i.e., log p(x | z)).
-        idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
-        cross_entropy = -torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
-        
-        # Compute log p(z).
-        log_pz = (-0.5 * z.pow(2) - math.log(math.sqrt(2 * math.pi))).sum(dim = -1, keepdim = True)
-            
-        # Compute log q(z | x).
-        if self.model.training and iw_samples > 1 and self.grad_estimator == "dreg":
-            mu_, std_ = mu.detach(), std.detach()
-            qz_x = dist.Normal(mu_, std_)
-        else:
-            qz_x = dist.Normal(mu, std)
-        log_qz_x = qz_x.log_prob(z).sum(dim = -1, keepdim = True)
-        
-        # Compute KL divergence.
-        kld = log_qz_x - log_pz
-            
-        # Anneal KL divergence.
-        anneal_reg = (linear_annealing(0, 1, self.global_iter, self.steps_anneal)
-                      if self.model.training else 1)
-        annealed_kld = anneal_reg * kld
-
-        return cross_entropy, kld, annealed_kld
-    
-    # Approximate marginal log-likelihood of the observed data.
-    def log_likelihood(self,
-                       x,
-                       recon_x,
-                       mu,
-                       std,
-                       z,
-                       mc_samples,
-                       iw_samples):
-        # Compute ELBO components.
-        cross_entropy, kld, annealed_kld = self.elbo_components(x, recon_x, mu, std, z, mc_samples, iw_samples)
-        elbo = cross_entropy + annealed_kld
-        
-        if iw_samples == 1:
-            elbo = elbo.squeeze(0).mean(0)
-            if self.model.training:
-                return elbo.mean()
-            else:
-                return elbo.sum()
-        elif self.grad_estimator == "iwae":
-            elbo = -elbo
-            iw_elbo = math.log(elbo.size(0)) - elbo.logsumexp(dim = 0)
-                    
-            if self.model.training:
-                return iw_elbo.mean()
-            else:
-                return iw_elbo.mean(0).sum()
-        elif self.grad_estimator == "dreg":
-            elbo = -elbo
-            with torch.no_grad():
-                # Compute re-weighting factor for inference model gradient.
-                reweight = (elbo - elbo.logsumexp(dim = 0)).exp()
-                
-                if z.requires_grad:
-                    z.register_hook(lambda grad: reweight * grad)
-            
-            if self.model.training:
-                return (-reweight * elbo).sum(0).mean()
-            else:
-                return (-reweight * elbo).sum()
         
     # Compute pseudo-BIC.
     def bic(self,
