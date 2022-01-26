@@ -23,7 +23,7 @@ from pylab import *
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 import pandas as pd
-
+from typing import List
 
 EPS = 1e-7
 
@@ -32,14 +32,17 @@ EPS = 1e-7
 class MIRTVAE(nn.Module):
     
     def __init__(self,
-                 input_dim,
-                 inference_model_dims,
-                 latent_dim,
-                 Q,
-                 A,
-                 b,
-                 correlated_factors,
-                 device):
+         input_dim:            int,
+         inference_model_dims: List[int],
+         latent_dim:           int,
+         n_cats:               List[int],
+         Q,
+         A,
+         b,
+         correlated_factors,
+         device:               torch.device):
+
+
         """
         Args:
             input_dim            (int): Input vector dimension.
@@ -55,6 +58,10 @@ class MIRTVAE(nn.Module):
         self.latent_dim = latent_dim
         self.n_cats = n_cats
         self.device = device
+        self.Q = Q
+        self.A = A
+        self.b = b
+        self.correlated_factors = correlated_factors
         
         # Define inference model neural network.
         if self.inf_dims != []:
@@ -146,20 +153,22 @@ class MIRTVAE(nn.Module):
 class MIRTVAEClass(BaseClass):
     
     def __init__(self,
-                 input_dim,
-                 inference_model_dims,
-                 latent_dim,
-                 n_cats,
-                 learning_rate,
-                 device,
-                 log_interval,
-                 gradient_estimator = "dreg",
-                 Q = None,
-                 A = None,
-                 b = None,
-                 correlated_factors = [],
-                 steps_anneal = 0,
-                 verbose = False):
+         input_dim:            int,
+         inference_model_dims: List[int],
+         latent_dim:           int,
+         n_cats:               List[int],
+         learning_rate:        float,
+         device:               torch.device,
+         log_interval:         int,
+         gradient_estimator:   str = "dreg",
+         Q                     = None,
+         A                     = None,
+         b                     = None,
+         correlated_factors    = [],
+         steps_anneal:         int = 0,
+         inf_grad_estimator:   str = "dreg",
+         verbose:              bool = False):
+
         """
         New args:
             n_cats             (list of int): List containing number of categories for each observed variable.
@@ -172,6 +181,10 @@ class MIRTVAEClass(BaseClass):
         """
         super().__init__(input_dim, inference_model_dims, latent_dim, learning_rate,
                          device, log_interval, steps_anneal, verbose)
+        
+        self.Q = Q
+        self.A = A
+        self.b = b
         
         self.n_cats = n_cats
         self.grad_estimator = gradient_estimator
@@ -201,6 +214,52 @@ class MIRTVAEClass(BaseClass):
                       mc_samples,
                       iw_samples):
         # Compute log p(x | z).
+        
+        
+#         return self.log_likelihood(x, recon_x, mu, logstd, z, mc_samples, iw_samples)
+        
+#     # Fit for one epoch.
+#     def step(self,
+#              data,
+#              mc_samples,
+#              iw_samples):
+#         if self.model.training:
+#             self.optimizer.zero_grad()
+            
+#         output = self.model(data, mc_samples, iw_samples)
+#         loss = self.loss_function(data, *output, mc_samples, iw_samples)
+
+#         if self.model.training and not torch.isnan(loss):
+#             loss.backward()
+#             self.optimizer.step()
+
+#         return loss
+    # @property
+    # # Return unrotated loadings
+    # def get_unrotated_loadings(self):
+    #     return self.model.loadings.weight.data.numpy()
+    
+    
+    
+    
+    # @property
+    # # Return intercepts
+    # def get_intercepts(self):
+    #     return self.model.intercepts.bias.data.numpy()
+    
+    # Compute ELBO components.
+    # def elbo_components(self,
+    #                     x,
+    #                     recon_x,
+    #                     mu,
+    #                     std,
+    #                     z,
+    #                     mc_samples,
+    #                     iw_samples):
+        # Compute cross-entropy (i.e., log p(x | z)).
+        
+        
+        
         idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
         log_px_z = -(torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
         
@@ -292,9 +351,9 @@ class MIRTVAEClass(BaseClass):
         
     # Compute pseudo-BIC.
     def bic(self,
-            csv_test,
-            iw_samples = 1,
-            data_loader_kwargs = {}):
+            csv_test:           pd.DataFrame,
+            iw_samples:         int = 1,
+            data_loader_kwargs: dict = {}):
         eval_loader = torch.utils.data.DataLoader(
         csv_dataset(data = csv_test.reset_index(drop = True), 
                     which_split = "full"),
@@ -330,10 +389,16 @@ class MIRTVAEClass(BaseClass):
     
     # Compute EAP estimates of factor scores.
     def scores(self,
-               eval_loader,
+               csv_test,
                mc_samples = 1,
                iw_samples = 1):
+        
+        eval_loader = torch.utils.data.DataLoader(
+        csv_dataset(data = csv_test.reset_index(drop = True), 
+                    which_split = "full"),
+        batch_size = 32, shuffle = True, **data_loader_kwargs)
         # Switch to evaluation mode.
+        
         self.model.eval()
         
         scores_ls = []
@@ -364,36 +429,29 @@ class MIRTVAEClass(BaseClass):
         return torch.cat(scores_ls, dim = 0)
             
             
-def screeplot(latent_dims, # list of dimensions in ascending order
-                            csv_data,
-                            categories,
-                            n_cats, 
-                            #ipip_train_loader, 
-                            #ipip_test_loader,
-                            which_split, 
-                            test_size,
-                            data_loader_kwargs = {},
-                            learning_rate = 5e-3,
-                            device = "cpu",
-                            log_interval = 100,
-                            steps_anneal = 1000,
-                            iw_samples_training = 5,
-                            iw_samples_bic = 5000,
-                            xlabel = "Number of Factors",
-                            ylabel = "Predicted Approximate Negative Log-Likelihood",
-                            title = "Approximate Log-Likelihood Scree Plot"):
+def screeplot(latent_dims:           List[int], # list of dimensions in ascending order
+              csv_data:              pd.DataFrame,
+              categories:            List[int],
+              n_cats:                List[int], 
+              which_split:           str, 
+              test_size:             float,
+              data_loader_kwargs:    dict = {},
+              learning_rate:         float = 5e-3,
+              device:                torch.device = "cpu",
+              log_interval:          int = 100,
+              steps_anneal:          int = 1000,
+              iw_samples_training:   int = 5,
+              iw_samples_bic:        int = 5000,
+              xlabel:                str = "Number of Factors",
+              ylabel:                str = "Predicted Approximate Negative Log-Likelihood",
+              title:                 str = "Approximate Log-Likelihood Scree Plot"):
     seed = 1
     ll_ls = []
     
     csv_train, csv_test = train_test_split(csv_data, train_size = 1 - test_size, test_size = test_size, random_state = 45)
     
-    #enc = OneHotEncoder(categories = categories)
-    #csv_test = enc.fit_transform(csv_test).toarray()
     csv_test = pd.DataFrame(csv_test)
             
-    
-    
-    
     for latent_dim in latent_dims:
 
         print("\rStarting fitting for P =", latent_dim, end="")
@@ -412,7 +470,10 @@ def screeplot(latent_dims, # list of dimensions in ascending order
                                 learning_rate = learning_rate,
                                 device = device,
                                 log_interval = log_interval,
-                                steps_anneal = steps_anneal)
+                                steps_anneal = steps_anneal,
+                                Q = None,
+                                A = None,
+                                b = None)
 
         # Fit model.
         # run training on training set
@@ -464,7 +525,11 @@ def get_rotated_loadings(loadings, method):
     return rot_loadings, rotator.phi_
 
     
-def loadings_heatmap(rot_loadings, loadings, x_label = "Factor", y_label = "Item", title = "Factor Loadings"):
+def loadings_heatmap(rot_loadings: [float], 
+                     loadings:     [float],
+                     x_label:      str = "Factor", 
+                     y_label:      str = "Item", 
+                     title:        str = "Factor Loadings"):
     norm_loadings = normalize_loadings(rot_loadings)
     c = pcolor(invert_factors(norm_loadings))
     set_cmap("gray_r")

@@ -160,13 +160,13 @@ class BaseClass():
 
     # Fit the model.
     def run_training(self,
-                     data,
-                     categories,
-                     eval_prop = .9,
-                     max_epochs = 3000,
-                     mc_samples = 1,
-                     iw_samples = 1,
-                     log_likelihood = False):
+                     data:           pd.DataFrame,
+                     categories:     [int],
+                     eval_prop:      float = .9,
+                     max_epochs:     int = 3000,
+                     mc_samples:     int = 1,
+                     iw_samples:     int = 1,
+                     log_likelihood: bool = False):
 
         data = pd.DataFrame(data)
 
@@ -175,7 +175,6 @@ class BaseClass():
                 which_split = "full",
                 csv_header = None,
                 categories = categories),
-                #batch_size = 32, shuffle = True, **kwargs)
                 batch_size = 32, shuffle = True)
         
         eval_loader = torch.utils.data.DataLoader(
@@ -184,10 +183,10 @@ class BaseClass():
                 test_size = eval_prop,
                 csv_header = None,
                 categories = categories),
-                #batch_size = 32, shuffle = True, **kwargs)
                 batch_size = 32, shuffle = True)
         
         epoch = 0
+        
         while not self.converged:
             self.train(train_loader, eval_loader, epoch, mc_samples, iw_samples)
 

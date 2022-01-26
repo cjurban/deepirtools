@@ -20,7 +20,6 @@ from sklearn.preprocessing import OneHotEncoder
 # Read in a data set from a CSV file.
 class csv_dataset(Dataset):
     def __init__(self,
-                 #csv_file,
                  data,
                  which_split,
                  csv_header = 0,
