@@ -202,6 +202,7 @@ class MIRTVAEClass(BaseClass):
         self.optimizer = optim.Adam([{"params" : self.model.parameters()}],
                                     lr = self.lr,
                                     amsgrad = True)
+        self.timerecords = dict.fromkeys(["Fitted Model", "Log-Likelihood" , "Rotated Loadings"])
         
                 
     # Compute loss for one batch.
@@ -213,53 +214,8 @@ class MIRTVAEClass(BaseClass):
                       z,
                       mc_samples,
                       iw_samples):
-        # Compute log p(x | z).
         
-        
-#         return self.log_likelihood(x, recon_x, mu, logstd, z, mc_samples, iw_samples)
-        
-#     # Fit for one epoch.
-#     def step(self,
-#              data,
-#              mc_samples,
-#              iw_samples):
-#         if self.model.training:
-#             self.optimizer.zero_grad()
-            
-#         output = self.model(data, mc_samples, iw_samples)
-#         loss = self.loss_function(data, *output, mc_samples, iw_samples)
-
-#         if self.model.training and not torch.isnan(loss):
-#             loss.backward()
-#             self.optimizer.step()
-
-#         return loss
-    # @property
-    # # Return unrotated loadings
-    # def get_unrotated_loadings(self):
-    #     return self.model.loadings.weight.data.numpy()
-    
-    
-    
-    
-    # @property
-    # # Return intercepts
-    # def get_intercepts(self):
-    #     return self.model.intercepts.bias.data.numpy()
-    
-    # Compute ELBO components.
-    # def elbo_components(self,
-    #                     x,
-    #                     recon_x,
-    #                     mu,
-    #                     std,
-    #                     z,
-    #                     mc_samples,
-    #                     iw_samples):
-        # Compute cross-entropy (i.e., log p(x | z)).
-        
-        
-        
+        # Compute log p(x | z).        
         idxs = x.long().expand(recon_x[..., -1].shape).unsqueeze(-1)
         log_px_z = -(torch.gather(recon_x, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
         
@@ -348,6 +304,12 @@ class MIRTVAEClass(BaseClass):
     # Return intercepts
     def get_intercepts(self):
         return self.model.intercepts.bias.data.numpy()
+    
+    @property
+    # Return dictionary with all time records for running functions
+    def get_time_records(self):
+
+        return self.timerecords
         
     # Compute pseudo-BIC.
     def bic(self,
@@ -358,7 +320,7 @@ class MIRTVAEClass(BaseClass):
         csv_dataset(data = csv_test.reset_index(drop = True), 
                     which_split = "full"),
         batch_size = 32, shuffle = True, **data_loader_kwargs)
-        print(eval_loader.dataset.df.head())
+        
     
         print("\nComputing approx. LL", end="")
         start = timeit.default_timer()
@@ -383,9 +345,10 @@ class MIRTVAEClass(BaseClass):
         # Compute BIC.
         bic = 2 * ll + np.log(N) * n_params
         stop = timeit.default_timer()
+        self.timerecords["Log-Likelihood"] = round(stop - start, 2)
         print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
 
-        return bic, -ll, n_params
+        return [bic, -ll, n_params]
     
     # Compute EAP estimates of factor scores.
     def scores(self,
@@ -427,6 +390,26 @@ class MIRTVAEClass(BaseClass):
         
         self.model.train()                                    
         return torch.cat(scores_ls, dim = 0)
+    
+    def get_rotated_loadings(self,
+                             loadings, 
+                             method, 
+                             loadings_only = True):
+    
+        start = timeit.default_timer()
+        rotator = Rotator(method = method)
+        rot_loadings = rotator.fit_transform(loadings)
+
+        stop = timeit.default_timer()
+        self.timerecords["Rotated Loadings"] = round(stop - start, 2)
+
+        print("\rRotated loadings computed in", round(stop - start, 2), "seconds", end = "")
+        sys.stdout.flush()
+        if loadings_only: 
+            return rot_loadings
+        else:
+            return rot_loadings, rotator.phi_, rotator.rotation_
+
             
             
 def screeplot(latent_dims:           List[int], # list of dimensions in ascending order
@@ -477,19 +460,22 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
 
         # Fit model.
         # run training on training set
-        print(type(csv_data))
+        
         ipip_vae.run_training(csv_data, categories, iw_samples = iw_samples_training)
         stop = timeit.default_timer()
-
+        
+        
         print("\rModel fitted for P =", latent_dim, ", run time =", round(stop - start, 2), "seconds", end = "")
 
         # Save predicted approximate negative log-likelihood.
         torch.manual_seed(seed)
         np.random.seed(seed)
         start = timeit.default_timer()
-        ll_ls.append(-ipip_vae.bic(csv_test, iw_samples = iw_samples_bic)[1]) # I set iw_samples = 5000 in the paper
+        
+        bic_result = ipip_vae.bic(csv_test, iw_samples = iw_samples_bic)
+        ll_ls.append(bic_result[1]) # I set iw_samples = 5000 in the paper
         stop = timeit.default_timer()
-
+   
         # print("Approx. LL stored, computed in", round(stop - start, 2), "seconds", end="")
 
     print("\n")
@@ -512,17 +498,7 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
     pdf = matplotlib.backends.backend_pdf.PdfPages("scree_plot.pdf")
     pdf.savefig(fig, dpi = 300)
     pdf.close()
-    return ll_ls
-
-def get_rotated_loadings(loadings, method):
-    start = timeit.default_timer()
-    rotator = Rotator(method = method)
-    rot_loadings = rotator.fit_transform(loadings)
-    
-    stop = timeit.default_timer()
-    print("\rRotated loadings computed in", round(stop - start, 2), "seconds", end = "")
-    sys.stdout.flush()
-    return rot_loadings, rotator.phi_
+    return ll_ls, ipip_vae
 
     
 def loadings_heatmap(rot_loadings: [float], 

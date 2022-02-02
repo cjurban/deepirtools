@@ -14,6 +14,8 @@ import os
 from sklearn.preprocessing import OneHotEncoder
 from read_data import csv_dataset
 import pandas as pd
+import timeit
+
 
 
 # The base class.
@@ -167,6 +169,7 @@ class BaseClass():
                      mc_samples:     int = 1,
                      iw_samples:     int = 1,
                      log_likelihood: bool = False):
+        start = timeit.default_timer()
 
         data = pd.DataFrame(data)
 
@@ -195,7 +198,8 @@ class BaseClass():
                 print("Failed to converge within " + str(max_epochs) + " epochs.")
                 break
                 
-
+        stop = timeit.default_timer()
+        self.timerecords["Fitted Model"] = round(stop - start, 2)
     # Save the model.
     def save_model(self,
                    model_name,
