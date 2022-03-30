@@ -105,7 +105,7 @@ class BaseClass():
                 self.loss_improvement_counter += 1
                 if self.loss_improvement_counter >= 100:
                     self.converged = True
-            if (self.global_iter - 1) % self.log_interval == 0:
+            if (self.global_iter - 1) % self.log_interval == 0: # issue here -- log_interval multiple/divisble by 100?
                 if self.verbose:
                     print("Epoch = {:7d}".format(epoch),
                           "Iter. = {:6d}".format(self.global_iter),

@@ -167,7 +167,7 @@ class MIRTVAEClass(BaseClass):
          correlated_factors    = [],
          steps_anneal:         int = 0,
          inf_grad_estimator:   str = "dreg",
-         verbose:              bool = False):
+         verbose:              bool = True):
 
         """
         New args:

@@ -47,7 +47,7 @@ def init_sparse_xavier_uniform_(init_mat,
     fan_in = init_mat.size(1)
     fan_outs = pattern_mat.sum(dim = 0)
     a = torch.sqrt(6 / (fan_in + fan_outs))
-    init_mat.data[:, :] = dist.Uniform(-a, a).sample([init_mat.size(0)]).mul_(pattern_mat)
+    init_mat.data[:, :] = torch.distributions.Uniform(-a, a).sample([init_mat.size(0)]).mul_(pattern_mat)
     
     return init_mat
 
