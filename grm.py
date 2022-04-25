@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from base import BaseEstimator
 from models import GRMVAE
+from utils import tensor_dataset
 
 EPS = 1e-7
 
@@ -144,8 +145,7 @@ class GRMEstimator(BaseEstimator):
         print("\nComputing approx. LL", end="")
         
         start = timeit.default_timer()
-        ll = -self.test(loader, mc_samples =  mc_samples, iw_samples = iw_samples)
-        start = timeit.default_timer()
+        ll = self.test(loader, mc_samples =  mc_samples, iw_samples = iw_samples)
         stop = timeit.default_timer()
         self.timerecords["log_likelihood"] = stop - start
         print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")

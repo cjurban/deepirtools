@@ -133,12 +133,16 @@ class BaseEstimator():
              mc_samples:  int,
              iw_samples:  int,
             ):
+        self.model.eval()
         test_loss = 0
         
         for batch in test_loader:
             batch = batch.to(self.device).float()
             loss = self.step(batch, mc_samples, iw_samples)
             test_loss += loss.item()
+        
+        self.model.train()
+            
         return test_loss
 
     def fit(self,
@@ -163,12 +167,12 @@ class BaseEstimator():
 
             epoch += 1
             if epoch == max_epochs and not self.converged:
-                print("Failed to converge within " + str(max_epochs) + " epochs.")
+                print("\nFailed to converge within " + str(max_epochs) + " epochs.")
                 break
                 
         stop = timeit.default_timer()
         self.timerecords["fit"] = stop - start
-        print("\nModel converged in ", round(stop - start, 2), " seconds", end = "\n")
+        print("\nFitting ended in ", round(stop - start, 2), " seconds", end = "\n")
         
     def save_model(self,
                    model_name: str,
