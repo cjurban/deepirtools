@@ -55,19 +55,6 @@ def init_sparse_xavier_uniform_(init_mat,
 def logistic_thresholds(n_cats):
     thresholds = [logistic.ppf((cat + 1)/ n_cats) for cat in range(n_cats - 1)]
     return np.asarray(thresholds, dtype = np.float32)
-
-# Convert Tensor of Cartesian coordinates to spherical coordinates.
-def cart2spher(cart_mat):
-    n = cart_mat.size(1)
-    spher_mat = torch.zeros_like(cart_mat)
-    cos_mat = cart_mat[:, 1:n].cos()
-    sin_mat = cart_mat[:, 1:n].sin().cumprod(1)
-    
-    spher_mat[:, 0] = cart_mat[:, 0] * cos_mat[:, 0]
-    spher_mat[:, 1:(n - 1)] = cart_mat[:, 0].unsqueeze(1) * sin_mat[:, 0:(n - 2)] * cos_mat[:, 1:(n - 1)]
-    spher_mat[:, -1] = cart_mat[:, 0] * sin_mat[:, -1]
-    
-    return spher_mat
         
 # Convert covariance matrix to correlation matrix.
 # http://www.statsmodels.org/0.6.1/_modules/statsmodels/stats/moment_helpers.html

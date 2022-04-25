@@ -32,10 +32,10 @@ EPS = 1e-7
 class MIRTVAE(nn.Module):
     
     def __init__(self,
-         input_dim:            int,
-         inference_model_dims: List[int],
-         latent_dim:           int,
-         n_cats:               List[int],
+         input_size:            int,
+         inference_model_sizes: List[int],
+         latent_size:           int,
+         n_cats:                List[int],
          Q,
          A,
          b,
@@ -45,68 +45,39 @@ class MIRTVAE(nn.Module):
 
         """
         Args:
-            input_dim            (int): Input vector dimension.
-            inference_model_dims (list of int): Inference model neural network layer dimensions.
-            latent_dim           (int): Latent vector dimension.
-            n_cats               (list of int): List containing number of categories for each observed variable.
-            device               (str): String specifying whether to run on CPU or GPU.
+            input_size            (int): Input vector dimension.
+            inference_model_sizes (list of int): Inference model neural network layer dimensions.
+            latent_size           (int): Latent vector dimension.
+            n_cats                (list of int): List containing number of categories for each observed variable.
+            device                (str): String specifying whether to run on CPU or GPU.
         """
         super(MIRTVAE, self).__init__()
-
-        self.input_dim = input_dim
-        self.inf_dims = inference_model_dims
-        self.latent_dim = latent_dim
-        self.n_cats = n_cats
-        self.device = device
-        self.Q = Q
-        self.A = A
-        self.b = b
-        self.correlated_factors = correlated_factors
         
-        # Define inference model neural network.
-        if self.inf_dims != []:
-            inf_list = []
-            inf_list.append(nn.Linear(self.input_dim, self.inf_dims[0]))
-            inf_list.append(nn.ELU())
-            if len(self.inf_dims) > 1:
-                for k in range(len(self.inf_dims) - 1):
-                    inf_list.append(nn.Linear(self.inf_dims[k], self.inf_dims[k + 1]))
-                    inf_list.append(nn.ELU())
-            inf_list.append(nn.Linear(self.inf_dims[len(self.inf_dims) - 1], 
-                                      self.latent_dim + self.latent_dim))
-            self.inf = nn.Sequential(*inf_list)
+        # Inference model neural network.
+        inf_sizes = [input_size] + inference_model_sizes
+        inf_list = sum( ([nn.Linear(size1, size2), nn.ELU()] for size1, size2 in
+                          zip(inf_sizes[0:-1], inf_sizes[1:])), [] )
+        if inf_list != []:
+            self.inf_net = nn.Sequential(*inf_list)
         else:
-            self.inf = nn.Linear(self.inf_dims[len(self.inf_dims) - 1], 
-                                 self.latent_dim + self.latent_dim)
+            self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))
         
-        # Define loadings matrix.
-        if Q is not None:
-            self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
-            init_sparse_xavier_uniform_(self.loadings.weight, Q)
-        elif self.A is not None:
-            self.loadings = LinearConstraints(self.latent_dim, len(self.n_cats), self.A, self.b)
-        else:
-            self.loadings = nn.Linear(self.latent_dim, len(self.n_cats), bias = False)
-            nn.init.xavier_uniform_(self.loadings.weight)
+        self.projector = CatProjector(latent_size, n_cats, Q, A, b)
         
-        # Define intercept vector.
-        self.intercepts = CatBiasReshape(self.n_cats, self.device)
-        
-        # Define Cholesky decomposition of factor covariance matrix.
-        self.cholesky = Spherical(self.latent_dim, self.correlated_factors, self.device)
+        self.cholesky = Spherical(latent_size, correlated_factors, device)
         
         self.reset_parameters()
         
     def reset_parameters(self):
-        nn.init.normal_(self.inf[-1].weight, mean=0., std=0.001)
-        nn.init.normal_(self.inf[-1].bias[0:self.latent_dim], mean=0., std=0.001)
-        nn.init.normal_(self.inf[-1].bias[self.latent_dim:], mean=math.log(math.exp(1) - 1), std=0.001)
+        nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
+        nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
+        nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
 
     def encode(self,
                x,
                mc_samples,
                iw_samples):
-        hidden = self.inf(x)
+        hidden = self.inf_net(x)
 
         # Expand for Monte Carlo samples.
         hidden = hidden.unsqueeze(0).expand(torch.Size([mc_samples]) + hidden.shape)
@@ -119,32 +90,13 @@ class MIRTVAE(nn.Module):
             
         return mu, std + EPS
 
-    def reparameterize(self,
-                       mu,
-                       std):
-        # Impute factor scores.
-        z = mu + std * torch.randn_like(mu)
-
-        return z
-        
-    def decode(self,
-               z):
-        Bz = self.loadings(z)
-        cum_probs = self.intercepts(Bz.unsqueeze(-1).expand(Bz.shape +
-                                                                 torch.Size([max(self.n_cats) - 1]))).sigmoid()
-        upper_probs = F.pad(cum_probs, (0, 1), value=1.)
-        lower_probs = F.pad(cum_probs, (1, 0), value=0.)
-        probs = upper_probs - lower_probs
-        
-        return probs
-
     def forward(self,
                 x,
                 mc_samples = 1,
                 iw_samples = 1):
         mu, std = self.encode(x, mc_samples, iw_samples)
-        z = self.reparameterize(mu, std)
-        recon_x = self.decode(z)
+        z = mu + std * torch.randn_like(mu)
+        recon_x = self.projector(z)
         
         return recon_x, mu, std, z
     
@@ -153,9 +105,9 @@ class MIRTVAE(nn.Module):
 class MIRTVAEClass(BaseClass):
     
     def __init__(self,
-         input_dim:            int,
-         inference_model_dims: List[int],
-         latent_dim:           int,
+         input_size:            int,
+         inference_model_sizes: List[int],
+         latent_size:           int,
          n_cats:               List[int],
          learning_rate:        float,
          device:               torch.device,
@@ -179,7 +131,7 @@ class MIRTVAEClass(BaseClass):
             b                     (Tensor): Vector implementing linear constraints.
             correlated_factors    correlated_factors    (list of int): List of correlated factors.
         """
-        super().__init__(input_dim, inference_model_dims, latent_dim, learning_rate,
+        super().__init__(input_size, inference_model_sizes, latent_size, learning_rate,
                          device, log_interval, steps_anneal, verbose)
         
         self.Q = Q
@@ -190,9 +142,9 @@ class MIRTVAEClass(BaseClass):
         self.grad_estimator = gradient_estimator
         self.correlated_factors = correlated_factors
         self.inf_grad_estimator = inf_grad_estimator
-        self.model = MIRTVAE(input_dim = self.input_dim,
-                             inference_model_dims = self.inf_dims,
-                             latent_dim = self.latent_dim,
+        self.model = MIRTVAE(input_size = self.input_size,
+                             inference_model_sizes = self.inf_sizes,
+                             latent_size = self.latent_size,
                              n_cats = self.n_cats,
                              Q = self.Q,
                              A = self.A,
@@ -386,7 +338,7 @@ class MIRTVAEClass(BaseClass):
                     iw_idxs = dist.Categorical(probs = reweight.T).sample().reshape(-1)
                     mc_idxs = torch.from_numpy(np.arange(mc_samples)).repeat(data.size(0))
                     batch_idxs = torch.from_numpy(np.arange(data.size(0))).repeat_interleave(mc_samples)
-                    scores_ls.append(z[iw_idxs, mc_idxs, batch_idxs, ...].reshape(data.size(0), mc_samples, self.latent_dim).mean(-2))
+                    scores_ls.append(z[iw_idxs, mc_idxs, batch_idxs, ...].reshape(data.size(0), mc_samples, self.latent_size).mean(-2))
         
         self.model.train()                                    
         return torch.cat(scores_ls, dim = 0)
@@ -412,7 +364,7 @@ class MIRTVAEClass(BaseClass):
 
             
             
-def screeplot(latent_dims:           List[int], # list of dimensions in ascending order
+def screeplot(latent_sizes:           List[int], # list of dimensions in ascending order
               csv_data:              pd.DataFrame,
               categories:            List[int],
               n_cats:                List[int], 
@@ -435,9 +387,9 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
     
     csv_test = pd.DataFrame(csv_test)
             
-    for latent_dim in latent_dims:
+    for latent_size in latent_sizes:
 
-        print("\rStarting fitting for P =", latent_dim, end="")
+        print("\rStarting fitting for P =", latent_size, end="")
 
         # Set random seeds.
         torch.manual_seed(seed)
@@ -446,9 +398,9 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
         # Initialize model.
         start = timeit.default_timer()
 
-        ipip_vae = MIRTVAEClass(input_dim = csv_data.shape[1],
-                                inference_model_dims = [int(np.ceil(csv_data.shape[1]/2))], # adjust NN size for different P
-                                latent_dim = latent_dim,
+        ipip_vae = MIRTVAEClass(input_size = csv_data.shape[1],
+                                inference_model_sizes = [int(np.ceil(csv_data.shape[1]/2))], # adjust NN size for different P
+                                latent_size = latent_size,
                                 n_cats = n_cats,
                                 learning_rate = learning_rate,
                                 device = device,
@@ -465,7 +417,7 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
         stop = timeit.default_timer()
         
         
-        print("\rModel fitted for P =", latent_dim, ", run time =", round(stop - start, 2), "seconds", end = "")
+        print("\rModel fitted for P =", latent_size, ", run time =", round(stop - start, 2), "seconds", end = "")
 
         # Save predicted approximate negative log-likelihood.
         torch.manual_seed(seed)
@@ -479,7 +431,7 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
         # print("Approx. LL stored, computed in", round(stop - start, 2), "seconds", end="")
 
     print("\n")
-    for idx, dim in enumerate(latent_dims):
+    for idx, dim in enumerate(latent_sizes):
         print("Latent dimension =", dim, "Approx. LL =", round(-ll_ls[idx], 2))
 
         
@@ -487,9 +439,9 @@ def screeplot(latent_dims:           List[int], # list of dimensions in ascendin
     fig.set_size_inches(5, 5, forward = True)
     fig.set_size_inches(5, 5, forward = True)
     
-    ax.plot(latent_dims, [ll for ll in ll_ls], "k-o")
+    ax.plot(latent_sizes, [ll for ll in ll_ls], "k-o")
     
-    ax.set_xticks(np.arange(min(latent_dims) - 1, max(latent_dims) + 2).tolist())
+    ax.set_xticks(np.arange(min(latent_sizes) - 1, max(latent_sizes) + 2).tolist())
     ax.set_ylabel(ylabel)
     ax.set_xlabel(xlabel)
     fig.suptitle(title)
