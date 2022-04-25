@@ -49,6 +49,7 @@ class GRMEstimator(BaseEstimator):
                             correlated_factors = correlated_factors,
                            ).to(device)
         self.n_cats = n_cats
+        assert(not (Q is not None and A is not None)) # print errors at asserts
         self.Q = Q
         self.A = A
         self.b = b
