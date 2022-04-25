@@ -1,11 +1,15 @@
 import torch
+from torch import optim
+import torch.distributions as dist
 import math
-from read_data import tensor_dataset
 import timeit
 from factor_analyzer import Rotator
 from typing import List, Optional
 
 from base import BaseEstimator
+from models import GRMVAE
+
+EPS = 1e-7
 
   
 class GRMEstimator(BaseEstimator):
@@ -19,10 +23,10 @@ class GRMEstimator(BaseEstimator):
                  device:              str,
                  gradient_estimator:  str = "dreg",
                  Q:                   Optional[torch.Tensor] = None,
-                 A                    Optional[torch.Tensor] = None,
-                 b                    Optional[torch.Tensor] = None,
-                 correlated_factors   = [],
-                 log_interval:        int = 100
+                 A:                   Optional[torch.Tensor] = None,
+                 b:                   Optional[torch.Tensor] = None,
+                 correlated_factors:  List[int] = [],
+                 log_interval:        int = 100,
                  verbose:             bool = True,
                 ):
         """
@@ -33,16 +37,16 @@ class GRMEstimator(BaseEstimator):
         assert(gradient_estimator == "iwae" or gradient_estimator == "dreg")
         self.grad_estimator = gradient_estimator
         
-        self.model = MIRTVAE(input_size = input_size,
-                             inference_net_sizes = inference_net_sizes,
-                             latent_size = latent_size,
-                             n_cats = n_cats,
-                             Q = Q,
-                             A = A,
-                             b = b,
-                             device = device,
-                             correlated_factors = correlated_factors,
-                            ).to(device)
+        self.model = GRMVAE(input_size = input_size,
+                            inference_net_sizes = inference_net_sizes,
+                            latent_size = latent_size,
+                            n_cats = n_cats,
+                            Q = Q,
+                            A = A,
+                            b = b,
+                            device = device,
+                            correlated_factors = correlated_factors,
+                           ).to(device)
         self.n_cats = n_cats
         self.Q = Q
         self.A = A
@@ -122,7 +126,7 @@ class GRMEstimator(BaseEstimator):
             else:
                 return (-w_tilda * elbo).sum()
        
-    @torch.no_grad
+    @torch.no_grad()
     def log_likelihood(self,
                        data:         torch.Tensor,
                        missing_mask: Optional[torch.Tensor] = None,
@@ -150,7 +154,7 @@ class GRMEstimator(BaseEstimator):
 
         return ll
     
-    @torch.no_grad
+    @torch.no_grad()
     def scores(self,
                data:         torch.Tensor,
                missing_mask: Optional[torch.Tensor] = None,
@@ -172,7 +176,7 @@ class GRMEstimator(BaseEstimator):
                 scores_ls.append(mu.mean(1).squeeze())
             else:
                 log_py_x, log_qx_y, log_px = self.loss_function(
-                                                   data, recon_y, mu, logstd, x, mc_samples,
+                                                   batch, recon_y, mu, logstd, x, mc_samples,
                                                    iw_samples, return_components=True
                                              )
                 elbo = -log_py_x - log_qx_y + log_px
@@ -202,8 +206,8 @@ class GRMEstimator(BaseEstimator):
         
     @property
     def loadings(self):
-        return self.model.projector.loadings.weight # need to define this property in projector
+        return self.model.projector.loadings.weight.data # need to define this property in projector?
     
     @property
     def intercepts(self):
-        return self.model.projector.intercepts.bias
+        return self.model.projector.intercepts.bias.data

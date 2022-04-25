@@ -6,15 +6,28 @@ import numpy as np
 from scipy.stats import logistic
 from sklearn.model_selection import train_test_split
 from typing import List, Optional
+
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 from pylab import *
 
 
-def logistic_thresholds(n_cats: List[int]):
-    """"""
-    thresholds = [logistic.ppf((cat + 1)/ n_cats) for cat in range(n_cats - 1)]
-    return np.asarray(thresholds, dtype = np.float32)
+def sigmoid(x):
+    y = 1/(1+np.exp(-x))
+    return y
+
+
+def inv_sigmoid(y):
+    x = -np.log(y**-1 - 1)
+    return x
+
+
+def get_thresholds(rng, n_cat):
+    lower_prob = sigmoid(rng[0])
+    upper_prob = sigmoid(rng[1])
+    probs = np.linspace(lower_prob, upper_prob, n_cat + 1)[1:-1]
+    thresholds = inv_sigmoid(probs)
+    return thresholds
 
         
 def invert_factors(mat: np.ndarray):
@@ -75,6 +88,7 @@ class tensor_dataset(Dataset):
         Args:
         """
         self.data = data
+        self.mask = mask
     
     def __len__(self):
         return len(self.data)

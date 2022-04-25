@@ -2,11 +2,10 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 import os
-import pandas as pd
 import timeit
 from typing import List, Optional
 
-from data import tensor_dataset
+from utils import tensor_dataset
 
 
 class BaseEstimator():
@@ -92,7 +91,7 @@ class BaseEstimator():
             mask = None
         batch =  batch.to(self.device).float() 
         output = self.model(batch, mc_samples, iw_samples)
-        loss = self.loss_function(data, *output, mc_samples, iw_samples, mask)
+        loss = self.loss_function(batch, *output, mc_samples, iw_samples, mask)
 
         if self.model.training and not torch.isnan(loss):
             loss.backward()
@@ -128,7 +127,7 @@ class BaseEstimator():
             else:
                 break
 
-    @torch.no_grad
+    @torch.no_grad()
     def test(self,
              test_loader: Dataset,
              mc_samples:  int,

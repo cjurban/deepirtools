@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from utils import *
 from typing import List, Optional
+from itertools import chain
 
 EPS = 1e-7
 
@@ -21,6 +22,8 @@ class CatBiasReshape(nn.Module):
         
         # Biases.
         bias = torch.empty(sum([n_cat - 1 for n_cat in n_cats]))
+        if mask is None:
+            mask = torch.ones_like(bias)
         idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
         bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
                                                 idx, n_cat in zip(idxs[:-1], n_cats)]))
@@ -49,15 +52,11 @@ class CatBiasReshape(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                ):
-        if self.mask is not None:
-            return (self.bias_reshape * self.mask) + x
-        return self.bias_reshape + x
+        return (self.bias_reshape * self.mask) + x
     
     @property
     def bias(self):
-        if self.mask is not None:
-            return self.bias_reshape.view(-1)[self.drop_idxs] * self.mask.view(-1)
-        return self.bias_reshape.view(-1)[self.drop_idxs]
+        return self.bias_reshape.view(-1)[self.drop_idxs] * self.mask.view(-1)
     
     
 class SparseLinear(nn.Module):
@@ -132,9 +131,9 @@ class CatProjector(nn.Module):
                  latent_size: int,
                  n_cats:      List[int],
                  Q:           Optional[torch.Tensor] = None,
-                 A            Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
                  b:           Optional[torch.Tensor] = None,
-                 ints_mask    Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
                 ):
         """
         Args:
@@ -262,7 +261,7 @@ class GRMVAE(nn.Module):
     
     def __init__(self,
                  input_size:            int,
-                 inference_model_sizes: List[int],
+                 inference_net_sizes:   List[int],
                  latent_size:           int,
                  n_cats:                List[int],
                  Q,
@@ -277,10 +276,11 @@ class GRMVAE(nn.Module):
         super(GRMVAE, self).__init__()
         
         # Inference model neural network.
-        inf_sizes = [input_size] + inference_model_sizes
-        inf_list = sum( ([nn.Linear(size1, size2), nn.ELU()] for size1, size2 in
-                          zip(inf_sizes[0:-1], inf_sizes[1:])), [] )
+        inf_sizes = [input_size] + inference_net_sizes
+        inf_list = list(chain.from_iterable((nn.Linear(size1, size2), nn.ELU()) for size1, size2 in
+                        zip(inf_sizes[0:-1], inf_sizes[1:])))
         if inf_list != []:
+            inf_list.append(nn.Linear(inf_sizes[-1], int(2 * latent_size)))
             self.inf_net = nn.Sequential(*inf_list)
         else:
             self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))
@@ -290,10 +290,12 @@ class GRMVAE(nn.Module):
         
         # Latent prior.
         self.cholesky = Spherical(latent_size, correlated_factors, device)
+        self.latent_size = latent_size
         
         self.reset_parameters()
         
     def reset_parameters(self):
+        # Check type of inf_net?
         nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
         nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
