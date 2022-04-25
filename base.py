@@ -1,53 +1,36 @@
 #!/usr/bin/env python
 #
-# Code author: Christopher J. Urban
-#
-# Purpose: A base class for VAE-type models with functions for model fitting
-# and evaluation as well as saving and loading fitted models.
+# Purpose:
 #
 ###############################################################################
 
-from __future__ import print_function
 import torch
 import numpy as np
 import os
-from sklearn.preprocessing import OneHotEncoder
-from read_data import csv_dataset
+from data import tensor_dataset
 import pandas as pd
 import timeit
 
 
-
-# The base class.
-class BaseClass():
+class BaseEstimator():
 
     def __init__(self,
-                 input_dim,
-                 inference_model_dims,
-                 latent_dim,
-                 learning_rate,
-                 device,
-                 log_interval,
-                 steps_anneal = 0,
-                 verbose = True):
+                 input_size:            int,
+                 inference_model_sizes: List[int],
+                 latent_size:           int,
+                 learning_rate:         float,
+                 device:                str,
+                 log_interval:          int,
+                 verbose:               bool = True):
         """
         Args:
-            input_dim            (int): Input vector dimension.
-            inference_model_dims (list of int): Inference model neural network layer dimensions.
-            latent_dim           (int): Latent vector dimension.
-            learning_rate        (float): Learning rate for stochastic gradient descent.
-            device               (str): String specifying whether to run on CPU or GPU.
-            log_interval         (int): Number of batches to wait before printing progress report.
-            steps_anneal         (int): Number of batches over which to linearly anneal KL divergence.
-            verbose              (Boolean): Print progress reports.
         """
-        self.input_dim = input_dim
-        self.inf_dims = inference_model_dims
-        self.latent_dim = latent_dim
+        self.input_size = input_size
+        self.inf_sizes = inference_model_sizes
+        self.latent_size = latent_size
         self.lr = learning_rate
         self.device = device
         self.log_interval = log_interval
-        self.steps_anneal = steps_anneal
         self.verbose = verbose
 
         self.global_iter = 0 # Keeps track of number of fitting iterations (i.e., batches).
@@ -56,7 +39,6 @@ class BaseClass():
         self.best_avg_loss = None # Keeps track of best average loss.
         self.loss_improvement_counter = 0 # Keeps track of number of iterations since average loss has not improved.
         
-        # To be implemented by subclasses.
         self.model = None
         self.optimizer = None
 
@@ -116,7 +98,6 @@ class BaseClass():
     # Fit for one epoch.
     def train(self,
               train_loader,
-              eval_loader,
               epoch,
               mc_samples,
               iw_samples):
@@ -137,8 +118,7 @@ class BaseClass():
                     self.converged = True
                     break
                     
-                if self.global_iter >= self.steps_anneal:
-                    self.check_convergence(loss, epoch)
+                self.check_convergence(loss, epoch)
             else:
                 break
 
@@ -160,11 +140,8 @@ class BaseClass():
         self.model.train()
         return eval_loss
 
-    # Fit the model.
     def run_training(self,
                      data:           pd.DataFrame,
-                     categories:     [int],
-                     eval_prop:      float = .9,
                      max_epochs:     int = 3000,
                      mc_samples:     int = 1,
                      iw_samples:     int = 1,
@@ -174,24 +151,13 @@ class BaseClass():
         data = pd.DataFrame(data)
 
         train_loader =  torch.utils.data.DataLoader(
-                csv_dataset(data = data,
-                which_split = "full",
-                csv_header = None,
-                categories = categories),
-                batch_size = 32, shuffle = True)
-        
-        eval_loader = torch.utils.data.DataLoader(
-                csv_dataset(data = data,
-                which_split = "test-only",
-                test_size = eval_prop,
-                csv_header = None,
-                categories = categories),
+                tensor_dataset(data = data),
                 batch_size = 32, shuffle = True)
         
         epoch = 0
         
         while not self.converged:
-            self.train(train_loader, eval_loader, epoch, mc_samples, iw_samples)
+            self.train(train_loader, epoch, mc_samples, iw_samples)
 
             epoch += 1
             if epoch == max_epochs and not self.converged:
@@ -200,6 +166,7 @@ class BaseClass():
                 
         stop = timeit.default_timer()
         self.timerecords["Fitted Model"] = round(stop - start, 2)
+        
     # Save the model.
     def save_model(self,
                    model_name,
@@ -213,5 +180,3 @@ class BaseClass():
                    model_name,
                    load_path):
         self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth"))
- 
-        

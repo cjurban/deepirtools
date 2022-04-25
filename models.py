@@ -1,16 +1,30 @@
 #!/usr/bin/env python
 #
-# Author: Christopher J. Urban
-#
-# Purpose: Helpful layers for building models.
+# Purpose: 
 #
 ###############################################################################
 
 import torch
-from torch import nn
+from torch import nn, optim
 import torch.nn.functional as F
-import numpy as np
+import torch.distributions as dist
 from utils import *
+from helper_layers import *
+from base_class import BaseClass
+from read_data import csv_dataset
+import timeit
+
+import matplotlib.pyplot as plt
+import matplotlib.backends.backend_pdf
+from factor_analyzer import Rotator
+from pylab import *
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+import pandas as pd
+from typing import List
+
+EPS = 1e-7
+
 
 class CatBiasReshape(nn.Module):
     
@@ -242,3 +256,76 @@ class Spherical(nn.Module):
                                         self.weight)
         else:
             return torch.eye(self.dim, device=self.device)
+
+    
+# Variational autoencoder for MIRT module.
+class MIRTVAE(nn.Module):
+    
+    def __init__(self,
+         input_size:            int,
+         inference_model_sizes: List[int],
+         latent_size:           int,
+         n_cats:                List[int],
+         Q,
+         A,
+         b,
+         correlated_factors,
+         device:               torch.device):
+
+
+        """
+        Args:
+            input_size            (int): Input vector dimension.
+            inference_model_sizes (list of int): Inference model neural network layer dimensions.
+            latent_size           (int): Latent vector dimension.
+            n_cats                (list of int): List containing number of categories for each observed variable.
+            device                (str): String specifying whether to run on CPU or GPU.
+        """
+        super(MIRTVAE, self).__init__()
+        
+        # Inference model neural network.
+        inf_sizes = [input_size] + inference_model_sizes
+        inf_list = sum( ([nn.Linear(size1, size2), nn.ELU()] for size1, size2 in
+                          zip(inf_sizes[0:-1], inf_sizes[1:])), [] )
+        if inf_list != []:
+            self.inf_net = nn.Sequential(*inf_list)
+        else:
+            self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))
+        
+        self.projector = CatProjector(latent_size, n_cats, Q, A, b)
+        
+        self.cholesky = Spherical(latent_size, correlated_factors, device)
+        
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
+        nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
+        nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
+
+    def encode(self,
+               x,
+               mc_samples,
+               iw_samples):
+        hidden = self.inf_net(x)
+
+        # Expand for Monte Carlo samples.
+        hidden = hidden.unsqueeze(0).expand(torch.Size([mc_samples]) + hidden.shape)
+        
+        # Expand for importance-weighted samples.
+        hidden = hidden.unsqueeze(0).expand(torch.Size([iw_samples]) + hidden.shape)
+        
+        mu, std = hidden.chunk(chunks = 2, dim = -1)
+        std = F.softplus(std)
+            
+        return mu, std + EPS
+
+    def forward(self,
+                x,
+                mc_samples = 1,
+                iw_samples = 1):
+        mu, std = self.encode(x, mc_samples, iw_samples)
+        z = mu + std * torch.randn_like(mu)
+        recon_x = self.projector(z)
+        
+        return recon_x, mu, std, z
