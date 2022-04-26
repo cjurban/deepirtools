@@ -11,10 +11,6 @@ from utils import tensor_dataset
 class BaseEstimator():
 
     def __init__(self,
-                 input_size:            int,
-                 inference_net_sizes:   List[int],
-                 latent_size:           int,
-                 learning_rate:         float,
                  device:                str,
                  log_interval:          int = 100,
                  verbose:               bool = True,
@@ -22,10 +18,6 @@ class BaseEstimator():
         """
         Args:
         """
-        self.input_size = input_size
-        self.inf_sizes = inference_net_sizes
-        self.latent_size = latent_size
-        self.lr = learning_rate
         self.device = device
         self.log_interval = log_interval
         self.verbose = verbose

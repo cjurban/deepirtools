@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 from pylab import *
 
-from grm import GRMEstimator
+from importance_weighted import ImportanceWeightedEstimator
 from utils import manual_seed, invert_factors
 
 
@@ -36,14 +36,14 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
     ll_list = []
     for idx, latent_size in enumerate(latent_sizes):
         print("\nLatent size = ", latent_size, end="\n")
-        model = GRMEstimator(input_size = n_items,
-                             inference_net_sizes = inference_net_sizes_list[idx],
-                             latent_size = latent_size,
-                             n_cats = n_cats,
-                             learning_rate = learning_rates[idx],
-                             device = device,
-                             log_interval = log_interval,
-                            )
+        model = ImportanceWeightedEstimator(learning_rate = learning_rates[idx],
+                                            device = device,
+                                            log_interval = log_interval,
+                                            input_size = n_items,
+                                            inference_net_sizes = inference_net_sizes_list[idx],
+                                            latent_size = latent_size,
+                                            n_cats = n_cats,
+                                           )
         model.fit(data, batch_size, missing_mask, max_epochs, iw_samples = iw_samples_fit)
 
         ll = model.log_likelihood(data_test, iw_samples = iw_samples_ll)

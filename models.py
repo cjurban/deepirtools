@@ -9,57 +9,13 @@ from itertools import chain
 EPS = 1e-7
 
 
-class CatBiasReshape(nn.Module):
-    
-    def __init__(self,
-                 n_cats: List[int],
-                 mask: Optional[torch.Tensor] = None,
-                ):
-        """
-        Args:
-        """
-        super(CatBiasReshape, self).__init__()
-        self.n_cats = n_cats
-        
-        # Biases.
-        bias = torch.empty(sum([n_cat - 1 for n_cat in n_cats]))
-        if mask is None:
-            mask = torch.ones_like(bias)
-        idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
-        bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
-                                                idx, n_cat in zip(idxs[:-1], n_cats)]))
-        bias_reshape, sliced_bias = self._reshape(bias, idxs, 9999.)
-        self.bias_reshape = nn.Parameter(bias_reshape)
-        if mask is not None:
-            self.mask = self._reshape(mask, idxs, 0., False)
-        
-        # Drop indices.
-        nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
-                                    value=float("nan")).unsqueeze(0) for
-                                    _slice in sliced_bias], axis = 0)
-        cum_probs_mask = nan_mask * 0. + 1.
-        self.drop_idxs = ~cum_probs_mask.view(-1).isnan().to(mask.device)
-        
-    def _reshape(self, t, idxs, pad_val, return_slices=True):
-        sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
-        t_reshape = torch.cat([F.pad(_slice,
-                                     (0, max(self.n_cats) - _slice.size(0) - 1),
-                                      value=pad_val).unsqueeze(0) for
-                                      _slice in sliced_t], axis = 0)
-        if return_slices:
-            return t_reshape, sliced_t
-        return t_reshape
+################################################################################
+#
+# Helper modules
+#
+################################################################################
 
-    def forward(self,
-                x: torch.Tensor,
-               ):
-        return (self.bias_reshape * self.mask) + x
-    
-    @property
-    def bias(self):
-        return self.bias_reshape.view(-1)[self.drop_idxs] * self.mask.view(-1)
-    
-    
+
 class SparseLinear(nn.Module):
     
     def __init__(self,
@@ -127,7 +83,65 @@ class LinearConstraints(nn.Module):
         return F.linear(self.free_weight, self.A, self.b).view(self.in_features, self.out_features).T
 
 
-class CatProjector(nn.Module):
+class CatBiasReshape(nn.Module):
+    
+    def __init__(self,
+                 n_cats: List[int],
+                 mask: Optional[torch.Tensor] = None,
+                ):
+        """
+        Args:
+        """
+        super(CatBiasReshape, self).__init__()
+        self.n_cats = n_cats
+        
+        # Biases.
+        bias = torch.empty(sum([n_cat - 1 for n_cat in n_cats]))
+        if mask is None:
+            mask = torch.ones_like(bias)
+        idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
+        bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
+                                                idx, n_cat in zip(idxs[:-1], n_cats)]))
+        bias_reshape, sliced_bias = self._reshape(bias, idxs, 9999.)
+        self.bias_reshape = nn.Parameter(bias_reshape)
+        if mask is not None:
+            self.mask = self._reshape(mask, idxs, 0., False)
+        
+        # Drop indices.
+        nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
+                                    value=float("nan")).unsqueeze(0) for
+                                    _slice in sliced_bias], axis = 0)
+        cum_probs_mask = nan_mask * 0. + 1.
+        self.drop_idxs = ~cum_probs_mask.view(-1).isnan().to(mask.device)
+        
+    def _reshape(self, t, idxs, pad_val, return_slices=True):
+        sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
+        t_reshape = torch.cat([F.pad(_slice,
+                                     (0, max(self.n_cats) - _slice.size(0) - 1),
+                                      value=pad_val).unsqueeze(0) for
+                                      _slice in sliced_t], axis = 0)
+        if return_slices:
+            return t_reshape, sliced_t
+        return t_reshape
+
+    def forward(self,
+                x: torch.Tensor,
+               ):
+        return (self.bias_reshape * self.mask) + x
+    
+    @property
+    def bias(self):
+        return self.bias_reshape.view(-1)[self.drop_idxs] * self.mask.view(-1)
+
+    
+################################################################################
+#
+# Measurement model modules
+#
+################################################################################
+    
+
+class GradedResponseModel(nn.Module):
     def __init__(self,
                  latent_size: int,
                  n_cats:      List[int],
@@ -139,9 +153,10 @@ class CatProjector(nn.Module):
         """
         Args:
         """
-        super(CatProjector, self).__init__()
+        super(GradedResponseModel, self).__init__()
         
         # Loadings.
+        assert(not (Q is not None and A is not None)) # print errors at asserts
         if Q is not None:
             self.loadings = SparseLinear(latent_size, len(n_cats), Q)
         elif A is not None:
@@ -172,6 +187,13 @@ class CatProjector(nn.Module):
         probs = upper_probs - lower_probs
         
         return probs
+    
+    
+################################################################################
+#
+# Latent prior modules
+#
+################################################################################
     
 
 class Spherical(nn.Module):
@@ -241,7 +263,7 @@ class Spherical(nn.Module):
         return F.linear(x, self.weight)
     
     @property
-    def cor(self):
+    def cov(self):
         if self.correlated_factors != []:
             weight = self.weight
 
@@ -250,31 +272,36 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.device)
     
     @property
-    def inv_cor(self):
+    def inv_cov(self):
         if self.correlated_factors != []:
             return torch.cholesky_solve(torch.eye(self.size, device=self.device),
                                         self.weight)
         else:
             return torch.eye(self.size, device=self.device)
 
+        
+################################################################################
+#
+# Autoencoder modules
+#
+################################################################################
+        
     
-class GRMVAE(nn.Module):
+class VariationalAutoencoder(nn.Module):
     
     def __init__(self,
+                 decoder,               
                  input_size:            int,
                  inference_net_sizes:   List[int],
                  latent_size:           int,
-                 n_cats:                List[int],
-                 Q,
-                 A,
-                 b,
-                 correlated_factors:   List[int],
-                 device:               str,
+                 device:                str,
+                 correlated_factors:    List[int] = [],
+                 **decoder_kwargs,
                 ):
         """
         Args:
         """
-        super(GRMVAE, self).__init__()
+        super(VariationalAutoencoder, self).__init__()
         
         # Inference model neural network.
         inf_sizes = [input_size] + inference_net_sizes
@@ -287,7 +314,7 @@ class GRMVAE(nn.Module):
             self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))
         
         # Measurement model.
-        self.projector = CatProjector(latent_size, n_cats, Q, A, b)
+        self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
         # Latent prior.
         self.cholesky = Spherical(latent_size, correlated_factors, device)
@@ -296,7 +323,7 @@ class GRMVAE(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self):
-        # Check type of inf_net?
+        # Check type of inf_net -- if one linear layer, can't index
         nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
         nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
@@ -307,10 +334,10 @@ class GRMVAE(nn.Module):
                iw_samples):
         hidden = self.inf_net(y)
 
-        # Expand for Monte Carlo samples.
+        # Monte Carlo samples.
         hidden = hidden.unsqueeze(0).expand(torch.Size([mc_samples]) + hidden.shape)
         
-        # Expand for importance-weighted samples.
+        # Importance-weighted samples.
         hidden = hidden.unsqueeze(0).expand(torch.Size([iw_samples]) + hidden.shape)
         
         mu, std = hidden.chunk(chunks = 2, dim = -1)
@@ -324,6 +351,6 @@ class GRMVAE(nn.Module):
                 iw_samples = 1):
         mu, std = self.encode(y, mc_samples, iw_samples)
         x = mu + std * torch.randn_like(mu)
-        recon_y = self.projector(x)
+        recon_y = self.decoder(x)
         
         return recon_y, mu, std, x

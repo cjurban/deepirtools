@@ -7,54 +7,34 @@ from factor_analyzer import Rotator
 from typing import List, Optional
 
 from base import BaseEstimator
-from models import GRMVAE
+from models import *
 from utils import tensor_dataset
 
 EPS = 1e-7
 
   
-class GRMEstimator(BaseEstimator):
+class ImportanceWeightedEstimator(BaseEstimator):
     
     def __init__(self,
-                 input_size:          int,
-                 inference_net_sizes: List[int],
-                 latent_size:         int,
-                 n_cats:              List[int],
                  learning_rate:       float,
                  device:              str,
+                 mirt_model:          str = "grm",
                  gradient_estimator:  str = "dreg",
-                 Q:                   Optional[torch.Tensor] = None,
-                 A:                   Optional[torch.Tensor] = None,
-                 b:                   Optional[torch.Tensor] = None,
-                 correlated_factors:  List[int] = [],
                  log_interval:        int = 100,
                  verbose:             bool = True,
+                 **model_kwargs,
                 ):
         """
         Args:
         """
-        super().__init__(input_size, inference_net_sizes, latent_size, learning_rate,
-                         device, log_interval, verbose)
-        assert(gradient_estimator == "iwae" or gradient_estimator == "dreg")
+        super().__init__(device, log_interval, verbose)
+        assert(gradient_estimator in ("iwae", "dreg"))
         self.grad_estimator = gradient_estimator
         
-        self.model = GRMVAE(input_size = input_size,
-                            inference_net_sizes = inference_net_sizes,
-                            latent_size = latent_size,
-                            n_cats = n_cats,
-                            Q = Q,
-                            A = A,
-                            b = b,
-                            device = device,
-                            correlated_factors = correlated_factors,
-                           ).to(device)
-        self.n_cats = n_cats
-        assert(not (Q is not None and A is not None)) # print errors at asserts
-        self.Q = Q
-        self.A = A
-        self.b = b
-        self.correlated_factors = correlated_factors
-        
+        assert(mirt_model in ("grm")) # TODO: Implement more mirt models
+        if mirt_model == "grm":
+            decoder = GradedResponseModel
+        self.model = VariationalAutoencoder(decoder=decoder, device=device, **model_kwargs)
         self.optimizer = optim.Adam([{"params" : self.model.parameters()}],
                                     lr = learning_rate,
                                     amsgrad = True)
@@ -76,7 +56,7 @@ class GRMEstimator(BaseEstimator):
         log_py_x = -(torch.gather(recon_y, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log().sum(dim = -1, keepdim = True)
         
         # Log p(x).
-        if self.correlated_factors != []:
+        if self.model.cholesky.correlated_factors != []:
             log_pz = dist.MultivariateNormal(torch.zeros_like(x).to(self.device),
                                              scale_tril = self.model.cholesky.weight).log_prob(x).unsqueeze(-1)
         else:
@@ -156,7 +136,7 @@ class GRMEstimator(BaseEstimator):
         return ll
     
     @torch.no_grad()
-    def scores(self,
+    def scores(self, # need to check this works, maybe make more efficient
                data:         torch.Tensor,
                missing_mask: Optional[torch.Tensor] = None,
                mc_samples:   int = 1,
@@ -189,26 +169,26 @@ class GRMEstimator(BaseEstimator):
                 scores_ls.append(x[iw_idxs, mc_idxs, batch_idxs, ...].reshape(data.size(0), mc_samples, self.latent_size).mean(-2))                  
         return torch.cat(scores_ls, dim = 0)
     
-    def rotate_loadings(self,
-                        method:        str, 
-                        loadings_only: bool = True):
-        loadings = self.loadings.numpy()
-        rotator = Rotator(method = method)
-        
-        start = timeit.default_timer()
-        rot_loadings = rotator.fit_transform(loadings)
-        stop = timeit.default_timer()
-        self.timerecords["rotation"] = stop - start
-
-        if loadings_only: 
-            return rot_loadings
-        else:
-            return rot_loadings, rotator.phi_, rotator.rotation_
+#    def rotate_loadings(self,
+#                        method:        str, 
+#                        loadings_only: bool = True):
+#        loadings = self.loadings.numpy()
+#        rotator = Rotator(method = method)
+#        
+#        start = timeit.default_timer()
+#        rot_loadings = rotator.fit_transform(loadings)
+#        stop = timeit.default_timer()
+#        self.timerecords["rotation"] = stop - start
+#
+#        if loadings_only: 
+#            return rot_loadings
+#        else:
+#            return rot_loadings, rotator.phi_, rotator.rotation_
         
     @property
-    def loadings(self):
-        return self.model.projector.loadings.weight.data # need to define this property in projector?
+    def loadings(self): # need to check this exists
+        return self.model.decoder.loadings.weight.data # need to define this property in decoder?
     
     @property
-    def intercepts(self):
-        return self.model.projector.intercepts.bias.data
+    def intercepts(self): # need to check this exists
+        return self.model.decoder.intercepts.bias.data
