@@ -24,7 +24,19 @@ class ImportanceWeightedEstimator(BaseEstimator):
                  **model_kwargs,
                 ):
         """
+        Importance-weighted amortized variational estimator (I-WAVE).
+        
         Args:
+            learning_rate       (float): Step size for stochastic gradient optimizer.
+            device              (str):   Computing device used for fitting.
+            mirt_model          (str):   Measurement model type. Current options are:
+                                             "grm" = graded response model
+            gradient_estimatorr (str):   Gradient estimator for inference model parameters:
+                                             "dreg" = doubly reparameterized gradient estimator
+                                             "iwae" = standard gradient estimator
+            log_interval        (str):   Frequency of updates printed during fitting.
+            verbose             (bool):  Whether to print updates during fitting.
+            model_kwargs        (dict):  Named parameters passed to VariationalAutoencoder.__init__().
         """
         super().__init__(device, log_interval, verbose)
         assert(gradient_estimator in ("iwae", "dreg"))
@@ -85,6 +97,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
                        mc_samples:   int = 1,
                        iw_samples:   int = 5000,
                       ):
+        """Log-likelihood for a data set."""
         loader =  torch.utils.data.DataLoader(
                     tensor_dataset(data=data, mask=missing_mask),
                     batch_size = 32, shuffle = True

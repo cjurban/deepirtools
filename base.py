@@ -16,7 +16,12 @@ class BaseEstimator():
                  verbose:               bool = True,
                 ):
         """
+        Base class from which other estimation methods inherit.
+        
         Args:
+            device       (str):  Computing device used for fitting.
+            log_interval (str):  Frequency of updates printed during fitting.
+            verbose      (bool): Whether to print updates during fitting.
         """
         self.device = device
         self.log_interval = log_interval
@@ -70,9 +75,7 @@ class BaseEstimator():
              batch,
              **model_kwargs,
             ):
-        """
-        One fitting iteration.
-        """
+        """One fitting iteration."""
         if self.model.training:
             self.optimizer.zero_grad()
             
@@ -96,9 +99,7 @@ class BaseEstimator():
               epoch:        int,
               **model_kwargs,
              ):
-        """
-        Full pass through data set.
-        """
+        """Full pass through data set."""
         self.model.train()
         train_loss = 0
 
@@ -123,6 +124,7 @@ class BaseEstimator():
              test_loader: Dataset,
              **model_kwargs,
             ):
+        """Evaluate model on a data set."""
         self.model.eval()
         test_loss = 0
         
@@ -141,6 +143,17 @@ class BaseEstimator():
             max_epochs:     int = 100000,
             **model_kwargs,
            ):
+        """
+        Fit model to a data set.
+        
+        Args:
+            data         (Tensor): Data set containing item responses.
+            batch_size   (int):    Mini-batch size for stochastic gradient optimizer.
+            missing_mask (Tensor): Binary mask indicating missing item responses.
+            max_epochs   (int):    Number of passes through the full data set after which
+                                   fitting should be terminated if convergence not achieved.
+            model_kwargs (dict):   Named parameters passed to self.model.forward().
+        """
         print("\nFitting started", end = "\n")
         start = timeit.default_timer()
 

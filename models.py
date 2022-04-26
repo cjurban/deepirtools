@@ -24,9 +24,7 @@ class SparseLinear(nn.Module):
                  out_features: int,
                  Q:            torch.Tensor,
                 ):
-        """
-        Args:
-        """
+        """Loadings with binary constraints."""
         super(SparseLinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -58,9 +56,7 @@ class LinearConstraints(nn.Module):
                  A:            torch.Tensor,
                  b:            Optional[torch.Tensor] = None,
                 ):
-        """
-        Args:
-        """
+        """Loadings with linear constraints."""
         super(LinearConstraints, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -90,9 +86,7 @@ class CatBiasReshape(nn.Module):
                  n_cats: List[int],
                  mask: Optional[torch.Tensor] = None,
                 ):
-        """
-        Args:
-        """
+        """Intercepts for graded response models. Reshaping makes computatiton faster."""
         super(CatBiasReshape, self).__init__()
         self.n_cats = n_cats
         
@@ -143,6 +137,7 @@ class CatBiasReshape(nn.Module):
     
 
 class GradedResponseModel(nn.Module):
+    
     def __init__(self,
                  latent_size: int,
                  n_cats:      List[int],
@@ -152,7 +147,15 @@ class GradedResponseModel(nn.Module):
                  ints_mask:   Optional[torch.Tensor] = None,
                 ):
         """
+        Samejima's graded response model.
+        
         Args:
+            latent_size (int):         Number of latent variables.
+            n_cats      (List of int): Number of categories for each item.
+            Q           (Tensor):      Binary matrix indicating measurement structure.
+            A           (Tensor):      Matrix imposing linear constraints on loadings.
+            b           (Tensor):      Vector imposing linear constraints on loadings.
+            ints_mask   (Tensor):      Vector constraining intercepts to fixed values.
         """
         super(GradedResponseModel, self).__init__()
         
@@ -182,6 +185,14 @@ class GradedResponseModel(nn.Module):
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                ):
+        """
+        Compute log p(data | latents).
+        
+        Args:
+            x    (Tensor): Latent variables.
+            y    (Tensor): Item responses.
+            mask (Tensor): Binary mask indicating missing item responses.
+        """
         Bx = self.loadings(x)
         cum_probs = self.intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
                                                                  torch.Size([max(self.n_cats) - 1]))).sigmoid()
@@ -195,6 +206,18 @@ class GradedResponseModel(nn.Module):
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
     
+
+class LogNormalModel(nn.Module):
+    
+        def __init__(self,
+                 latent_size: int,
+                ):
+            
+            self.beta = nn.Parameter(torch.zeros(latent_size))
+            self.free_alpha = nn.Parameter(torch.empty(latent_size))
+            
+            # TODO: Finish
+            
     
 ################################################################################
 #
@@ -207,14 +230,22 @@ class Spherical(nn.Module):
     
     def __init__(self,
                  size:               int,
+                 fixed_variances:    bool,
                  correlated_factors: List[int],
                  device:             str,
                 ):
         """
+        Spherical parameterization of a covariance matrix.
+        
         Args:
+            size               (int):         Number of correlated variables.
+            fixed_variances    (bool):        Whether to fix variances to one.
+            correlated_factors (List of int): Which variables should be correlated.
+            device             (str):         Computing device used for fitting.
         """
         super(Spherical, self).__init__()
         self.size = size
+        self.fixed_variances = fixed_variances
         self.correlated_factors = correlated_factors
         self.device = device
         
@@ -243,7 +274,7 @@ class Spherical(nn.Module):
         
     @property
     def weight(self):
-        if self.correlated_factors != []:
+        if self.correlated_factors != [] or not self.fixed_variances:
             tril_idxs = torch.tril_indices(row = self.size, col = self.size, offset = 0)
             theta_mat = torch.zeros(self.size, self.size, device=self.device)
             theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta
@@ -254,8 +285,8 @@ class Spherical(nn.Module):
             lower_tri_l_mat = (np.pi * exp_theta_mat) / (1 + theta_mat.exp())
             l_mat = exp_theta_mat.diag().diag_embed() + lower_tri_l_mat.tril(diagonal = -1)
 
-            # Constrain variances to one.
-            l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.device)
+            if self.fixed_variances:
+                l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.device)
             
             # Constrain specific correlations to zero.
             l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = np.pi / 2
@@ -271,7 +302,7 @@ class Spherical(nn.Module):
     
     @property
     def cov(self):
-        if self.correlated_factors != []:
+        if self.correlated_factors != [] or not self.fixed_variances:
             weight = self.weight
 
             return torch.matmul(weight, weight.t())
@@ -280,7 +311,7 @@ class Spherical(nn.Module):
     
     @property
     def inv_cov(self):
-        if self.correlated_factors != []:
+        if self.correlated_factors != [] or not self.fixed_variances:
             return torch.cholesky_solve(torch.eye(self.size, device=self.device),
                                         self.weight)
         else:
@@ -302,11 +333,22 @@ class VariationalAutoencoder(nn.Module):
                  inference_net_sizes:   List[int],
                  latent_size:           int,
                  device:                str,
+                 fixed_variances:       bool = True,
                  correlated_factors:    List[int] = [],
                  **decoder_kwargs,
                 ):
         """
+        Variational autoencoder with an interchangeable measurement model (i.e., decoder).
+        
         Args:
+            decoder             (nn.Module):   Measurement model whose forward() method returns log p(data | latents).
+            input_size          (int):         Number of observed variables.
+            inference_net_sizes (List of int): Neural network hidden layer dimensions.
+            latent_size         (int):         Number of latent variables.
+            device              (str):         Computing device used for fitting.
+            fixed_variances     (bool):        Whether to constrain latent variances to one.
+            correlated_factors  (List of int): Which latent variables should be correlated.
+            decoder_kwargs      (dict):        Named parameters passed to decoder.__init__().
         """
         super(VariationalAutoencoder, self).__init__()
         
@@ -324,7 +366,7 @@ class VariationalAutoencoder(nn.Module):
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
         # Latent prior.
-        self.cholesky = Spherical(latent_size, correlated_factors, device)
+        self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors, device)
         self.latent_size = latent_size
         
         self.reset_parameters()
@@ -340,6 +382,7 @@ class VariationalAutoencoder(nn.Module):
                mc_samples: int,
                iw_samples: int,
               ):
+        """Sample approximate latent variable posterior."""
         hidden = self.inf_net(y)
 
         # Monte Carlo samples.
@@ -354,12 +397,24 @@ class VariationalAutoencoder(nn.Module):
         return mu, std + EPS
 
     def forward(self,
-                y,
+                y:              torch.Tensor,
                 grad_estimator: str,
                 mask:           Optional[torch.Tensor] = None,
                 mc_samples:     int = 1,
                 iw_samples:     int = 1,
                ):
+        """
+        Compute variational lower bound (ELBO).
+        
+        Args:
+            y              (Tensor): Observed data.
+            grad_estimator (str):    Gradient estimator for inference model parameters:
+                                         "dreg" = doubly reparameterized gradient estimator
+                                         "iwae" = standard gradient estimator
+            mask           (Tensor): Binary mask indicating missing item responses.
+            mc_samples     (int):    Number of Monte Carlo samples.
+            iw_samples     (int):    Number of importance-weighted samples.
+        """
         mu, std = self.encode(y, mc_samples, iw_samples)
         x = mu + std * torch.randn_like(mu)
         

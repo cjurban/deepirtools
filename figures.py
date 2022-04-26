@@ -27,7 +27,26 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
               ylabel:                   str = "Predicted Approximate Negative Log-Likelihood",
               title:                    str = "Approximate Log-Likelihood Scree Plot",
              ):
-    """"""
+    """
+    In exploratory setting, make log-likelihood screeplot to detect number of latent factors.
+    
+    Args:
+        latent_sizes             (List of int):         Latent dimensions to plot.
+        data                     (Tensor):              Data set containing item responses.
+        n_cats                   (List of int):         Number of categories for each item.
+        test_size                (float):               Proportion of data used for calculating LL.
+        inference_net_sizes_list (List of List of int): Neural net hidden layer sizes for each latent dimension.
+        learning_rates           (List of float):       Step sizes for stochastic gradient optimizers.
+        missing_mask             (Tensor):              Binary mask indicating missing item responses.
+        max_epochs               (int):                 Number of passes through the full data set after which
+                                                        fitting should be terminated if convergence not achieved.
+        batch_size               (int):                 Mini-batch size for stochastic gradient optimizer.
+        device                   (str):                 Computing device used for fitting.
+        log_interval             (str):                 Frequency of updates printed during fitting.
+        iw_samples_fit           (int):                 Number of importance-weight samples for fitting.
+        iw_samples_ll            (int):                 Number of importance-weight samples for calculating LL.
+        random_seed              (int):                 Seed for reproducibility.
+    """
     assert(test_size > 0 and test_size < 1)
     data_train, data_test = train_test_split(data, train_size = 1 - test_size, test_size = test_size)
     n_items = data.size(1)
@@ -72,6 +91,7 @@ def loadings_heatmap(loadings:     np.ndarray,
                      x_label:      str = "Factor", 
                      y_label:      str = "Item", 
                      title:        str = "Factor Loadings"):
+    """Make heatmap of factor loadings."""
     latent_size = loadings.shape[1]
     
     c = pcolor(invert_factors(loadings))
