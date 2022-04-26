@@ -1,5 +1,5 @@
 import torch
-from sklearn.model_selection import train_test_split
+import numpy as np
 from typing import List, Optional
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
@@ -18,7 +18,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
               missing_mask:             Optional[torch.Tensor] = None,
               max_epochs:               int = 100000,
               batch_size:               int = 32,
-              device:                   torch.device = "cpu",
+              device:                   str = "cpu",
               log_interval:             int = 100,
               iw_samples_fit:           int = 1,
               iw_samples_ll:            int = 5000,
@@ -48,8 +48,12 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         random_seed              (int):                 Seed for reproducibility.
     """
     assert(test_size > 0 and test_size < 1)
-    data_train, data_test = train_test_split(data, train_size = 1 - test_size, test_size = test_size)
+    data_size = data.size(0)
     n_items = data.size(1)
+    train_idxs = torch.multinomial(torch.ones(data_size), int(ceil((1 - test_size) * data_size)))
+    test_idxs = np.setdiff1d(range(data_size), train_idxs)
+    data_train = data[train_idxs]; mask_train = missing_mask[train_idxs]
+    data_test = data[test_idxs]; mask_test = missing_mask[test_idxs]
             
     manual_seed(random_seed)
     ll_list = []
@@ -63,9 +67,9 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
                                             latent_size = latent_size,
                                             n_cats = n_cats,
                                            )
-        model.fit(data, batch_size, missing_mask, max_epochs, iw_samples = iw_samples_fit)
+        model.fit(data_train, batch_size, mask_train, max_epochs, iw_samples = iw_samples_fit)
 
-        ll = model.log_likelihood(data_test, iw_samples = iw_samples_ll)
+        ll = model.log_likelihood(data_test, missing_mask=mask_test, iw_samples = iw_samples_ll)
         ll_list.append(ll)
         
     fig, ax = plt.subplots(constrained_layout = True)

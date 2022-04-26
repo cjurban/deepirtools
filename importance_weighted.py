@@ -159,3 +159,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
     @property
     def intercepts(self): # need to check this exists
         return self.model.decoder.intercepts.bias.data
+    
+    @property
+    def cov(self): # need to check this exists
+        return self.model.cholesky.cov.data
