@@ -2,6 +2,7 @@ import math
 import torch
 from torch import nn
 import torch.nn.functional as F
+import torch.distributions as dist
 from utils import *
 from typing import List, Optional
 from itertools import chain
@@ -178,6 +179,8 @@ class GradedResponseModel(nn.Module):
 
     def forward(self,
                 x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
                ):
         Bx = self.loadings(x)
         cum_probs = self.intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
@@ -186,7 +189,11 @@ class GradedResponseModel(nn.Module):
         lower_probs = F.pad(cum_probs, (1, 0), value=0.)
         probs = upper_probs - lower_probs
         
-        return probs
+        idxs = y.long().expand(probs[..., -1].shape).unsqueeze(-1)
+        log_py_x = -(torch.gather(probs, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log()
+        if mask is not None:
+            log_py_x = log_py_x.mul(mask)
+        return log_py_x.sum(dim = -1, keepdim = True)
     
     
 ################################################################################
@@ -329,9 +336,10 @@ class VariationalAutoencoder(nn.Module):
         nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
 
     def encode(self,
-               y,
-               mc_samples,
-               iw_samples):
+               y:          torch.Tensor,
+               mc_samples: int,
+               iw_samples: int,
+              ):
         hidden = self.inf_net(y)
 
         # Monte Carlo samples.
@@ -347,10 +355,33 @@ class VariationalAutoencoder(nn.Module):
 
     def forward(self,
                 y,
-                mc_samples = 1,
-                iw_samples = 1):
+                grad_estimator: str,
+                mask:           Optional[torch.Tensor] = None,
+                mc_samples:     int = 1,
+                iw_samples:     int = 1,
+               ):
         mu, std = self.encode(y, mc_samples, iw_samples)
         x = mu + std * torch.randn_like(mu)
-        recon_y = self.decoder(x)
         
-        return recon_y, mu, std, x
+        # Log p(y | x).
+        log_py_x = self.decoder(x, y, mask)
+        
+        # Log p(x).
+        if self.cholesky.correlated_factors != []:
+            log_px = dist.MultivariateNormal(torch.zeros_like(x, device = x.device),
+                                             scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+        else:
+            log_px = dist.Normal(torch.zeros_like(x, device = x.device),
+                                 torch.ones_like(x, device = x.device)).log_prob(x).sum(-1, keepdim = True)
+            
+        # Log q(x | y).
+        if iw_samples > 1 and grad_estimator == "dreg":
+            qx_y = dist.Normal(mu.detach(), std.detach())
+        else:
+            qx_y = dist.Normal(mu, std)
+        log_qx_y = qx_y.log_prob(x).sum(dim = -1, keepdim = True)
+        
+        elbo = log_py_x + log_qx_y - log_px
+        if grad_estimator == "dreg":
+            return elbo, x
+        return elbo, None

@@ -30,6 +30,7 @@ class BaseEstimator():
         
         self.model = None
         self.optimizer = None
+        self.runtime_kwargs = {}
 
     def loss_function(self):
         raise NotImplementedError
@@ -67,8 +68,7 @@ class BaseEstimator():
                     
     def step(self,
              batch,
-             mc_samples: int,
-             iw_samples: int,
+             **model_kwargs,
             ):
         """
         One fitting iteration.
@@ -82,8 +82,8 @@ class BaseEstimator():
         else:
             mask = None
         batch =  batch.to(self.device).float() 
-        output = self.model(batch, mc_samples, iw_samples)
-        loss = self.loss_function(batch, *output, mc_samples, iw_samples, mask)
+        output = self.model(batch, mask=mask, **model_kwargs, **self.runtime_kwargs)
+        loss = self.loss_function(*output)
 
         if self.model.training and not torch.isnan(loss):
             loss.backward()
@@ -94,8 +94,7 @@ class BaseEstimator():
     def train(self,
               train_loader: Dataset,
               epoch:        int,
-              mc_samples:   int,
-              iw_samples:   int,
+              **model_kwargs,
              ):
         """
         Full pass through data set.
@@ -106,7 +105,7 @@ class BaseEstimator():
         for batch_idx, batch in enumerate(train_loader):
             if not self.converged:
                 self.global_iter += 1 
-                loss = self.step(batch, mc_samples, iw_samples)
+                loss = self.step(batch, **model_kwargs)
                 
                 if torch.isnan(loss):
                     print(("\nNaN loss obtained, ending fitting. "
@@ -122,15 +121,13 @@ class BaseEstimator():
     @torch.no_grad()
     def test(self,
              test_loader: Dataset,
-             mc_samples:  int,
-             iw_samples:  int,
+             **model_kwargs,
             ):
         self.model.eval()
         test_loss = 0
         
         for batch in test_loader:
-            batch = batch.to(self.device).float()
-            loss = self.step(batch, mc_samples, iw_samples)
+            loss = self.step(batch, **model_kwargs)
             test_loss += loss.item()
         
         self.model.train()
@@ -142,8 +139,7 @@ class BaseEstimator():
             batch_size:     int = 32,
             missing_mask:   Optional[torch.Tensor] = None,
             max_epochs:     int = 100000,
-            mc_samples:     int = 1,
-            iw_samples:     int = 1,
+            **model_kwargs,
            ):
         print("\nFitting started", end = "\n")
         start = timeit.default_timer()
@@ -155,7 +151,7 @@ class BaseEstimator():
         
         epoch = 0
         while not self.converged:
-            self.train(train_loader, epoch, mc_samples, iw_samples)
+            self.train(train_loader, epoch, **model_kwargs)
 
             epoch += 1
             if epoch == max_epochs and not self.converged:
