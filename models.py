@@ -437,6 +437,4 @@ class VariationalAutoencoder(nn.Module):
         log_qx_y = qx_y.log_prob(x).sum(dim = -1, keepdim = True)
         
         elbo = log_py_x + log_qx_y - log_px
-        if grad_estimator == "dreg":
-            return elbo, x
-        return elbo, None
+        return elbo, x

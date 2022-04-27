@@ -55,7 +55,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
                         
     def loss_function(self,
                       elbo: torch.Tensor,
-                      x:    Optional[torch.Tensor] = None,
+                      x:    torch.Tensor,
                      ):
         """Loss for one batch."""
         # ELBO over batch.
@@ -99,7 +99,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
                       ):
         """Log-likelihood for a data set."""
         loader =  torch.utils.data.DataLoader(
-                    tensor_dataset(data=data, mask=missing_mask),
+                    tensor_dataset(data = data, mask = missing_mask),
                     batch_size = 32, shuffle = True
                   )
         
@@ -109,7 +109,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
         print("\nComputing approx. LL", end="")
         
         start = timeit.default_timer()
-        ll = self.test(loader, mc_samples =  mc_samples, iw_samples = iw_samples)
+        ll = self.test(loader, mc_samples = mc_samples, iw_samples = iw_samples)
         stop = timeit.default_timer()
         self.timerecords["log_likelihood"] = stop - start
         print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
@@ -118,39 +118,38 @@ class ImportanceWeightedEstimator(BaseEstimator):
 
         return ll
     
-#    @torch.no_grad()
-#    def scores(self, # need to check this works, maybe make more efficient
-#               data:         torch.Tensor,
-#               missing_mask: Optional[torch.Tensor] = None,
-#               mc_samples:   int = 1,
-#               iw_samples:   int = 1,
-#              ):
-#        
-#        loader =  torch.utils.data.DataLoader(
-#                    tensor_dataset(data=data, mask=missing_mask),
-#                    batch_size = 32, shuffle = True
-#                  )
-#        
-#        scores_ls = []
-#        for batch in loader:
-#            batch = batch.to(self.device).float()
-#            recon_y, mu, logstd, x = self.model(batch, mc_samples, iw_samples)
-#
-#            if iw_samples == 1:
-#                scores_ls.append(mu.mean(1).squeeze())
-#            else:
-#                log_py_x, log_qx_y, log_px = self.loss_function(
-#                                                   batch, recon_y, mu, logstd, x, mc_samples,
-#                                                   iw_samples, return_components=True
-#                                             )
-#                elbo = -log_py_x - log_qx_y + log_px
-#                reweight = (elbo - elbo.logsumexp(dim = 0)).exp()
-#
-#                iw_idxs = dist.Categorical(probs = reweight.T).sample().reshape(-1)
-#                mc_idxs = torch.arange(mc_samples).repeat(data.size(0))
-#                batch_idxs = torch.arange(data.size(0)).repeat_interleave(mc_samples)
-#                scores_ls.append(x[iw_idxs, mc_idxs, batch_idxs, ...].reshape(data.size(0), mc_samples, self.latent_size).mean(-2))                  
-#        return torch.cat(scores_ls, dim = 0)
+    @torch.no_grad()
+    def scores(self, # need to check this works, maybe make more efficient
+               data:         torch.Tensor,
+               missing_mask: Optional[torch.Tensor] = None,
+               mc_samples:   int = 1,
+               iw_samples:   int = 1,
+              ):
+        
+        loader = torch.utils.data.DataLoader(
+                    tensor_dataset(data = data, mask = missing_mask),
+                    batch_size = 32, shuffle = True
+                  )
+        
+        scores = []
+        for batch in loader:
+            if isinstance(batch, list):
+                batch, mask = batch[0], batch[1]
+                mask = mask.to(self.device).float()
+            else:
+                mask = None
+            batch =  batch.to(self.device).float() 
+            batch_size = batch.size(0)
+            
+            elbo, x = self.model(batch, mask = mask, mc_samples = mc_samples,
+                                 iw_samples = iw_samples, **self.runtime_kwargs)
+            reweight = (elbo - elbo.logsumexp(dim = 0)).exp()
+            latent_size = x.size(-1)
+
+            idxs = torch.distributions.Categorical(probs = reweight.permute([1, 2, 3, 0])).sample()
+            idxs = idxs.expand(x[-1, ...].shape).unsqueeze(0).long()
+            scores.append(torch.gather(x, axis = 0, index = idxs).squeeze(0).mean(dim = 0))                  
+        return torch.cat(scores, dim = 0)
         
     @property
     def loadings(self): # need to check this exists
