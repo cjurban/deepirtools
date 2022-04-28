@@ -18,6 +18,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
               missing_mask:             Optional[torch.Tensor] = None,
               max_epochs:               int = 100000,
               batch_size:               int = 32,
+              gradient_estimator:       str = "dreg",
               device:                   str = "cpu",
               log_interval:             int = 100,
               iw_samples_fit:           int = 1,
@@ -42,6 +43,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         max_epochs               (int):                 Number of passes through the full data set after which
                                                         fitting should be terminated if convergence not achieved.
         batch_size               (int):                 Mini-batch size for stochastic gradient optimizer.
+        gradient_estimator       (str):                 Gradient estimator for inference model parameters:
         device                   (str):                 Computing device used for fitting.
         log_interval             (str):                 Frequency of updates printed during fitting.
         iw_samples_fit           (int):                 Number of importance-weight samples for fitting.
@@ -49,7 +51,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         random_seed              (int):                 Seed for reproducibility.
         model_kwargs             (dict):                Named parameters passed to VariationalAutoencoder.__init__().
     """
-    assert(test_size > 0 and test_size < 1)
+    assert(test_size > 0 and test_size < 1), "Test size must be between 0 and 1."
     data_size = data.size(0)
     n_items = data.size(1)
     train_idxs = torch.multinomial(torch.ones(data_size), int(ceil((1 - test_size) * data_size)))
@@ -64,6 +66,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         model = ImportanceWeightedEstimator(learning_rate = learning_rates[idx],
                                             device = device,
                                             model_type = model_type,
+                                            gradient_estimator = gradient_estimator,
                                             log_interval = log_interval,
                                             inference_net_sizes = inference_net_sizes_list[idx],
                                             latent_size = latent_size,

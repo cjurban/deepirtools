@@ -25,27 +25,29 @@ class ImportanceWeightedEstimator(BaseEstimator):
         Importance-weighted amortized variational estimator (I-WAVE).
         
         Args:
-            learning_rate       (float): Step size for stochastic gradient optimizer.
-            device              (str):   Computing device used for fitting.
-            model_type          (str):   Measurement model type. Current options are:
-                                             "grm"       = graded response model
-                                             "gpcm"      = generalized partial credit model
-                                             "normal"    = normal factor model
-                                             "lognormal" = log-normal factor model
-            gradient_estimatorr (str):   Gradient estimator for inference model parameters:
-                                             "dreg" = doubly reparameterized gradient estimator
-                                             "iwae" = standard gradient estimator
-            log_interval        (str):   Frequency of updates printed during fitting.
-            verbose             (bool):  Whether to print updates during fitting.
-            model_kwargs        (dict):  Named parameters passed to VariationalAutoencoder.__init__().
+            learning_rate      (float): Step size for stochastic gradient optimizer.
+            device             (str):   Computing device used for fitting.
+            model_type         (str):   Measurement model type. Current options are:
+                                            "grm"       = graded response model
+                                            "gpcm"      = generalized partial credit model
+                                            "normal"    = normal factor model
+                                            "lognormal" = log-normal factor model
+            gradient_estimator (str):   Gradient estimator for inference model parameters:
+                                            "dreg" = doubly reparameterized gradient estimator
+                                            "iwae" = standard gradient estimator
+            log_interval       (str):   Frequency of updates printed during fitting.
+            verbose            (bool):  Whether to print updates during fitting.
+            model_kwargs       (dict):  Named parameters passed to VariationalAutoencoder.__init__().
         """
         super().__init__(device, log_interval, verbose)
-        assert(gradient_estimator in ("iwae", "dreg")) # print error
+        grad_estimators = ("iwae", "dreg")
+        assert(gradient_estimator in grad_estimators), "gradient_estimator must be one of {}".format(grad_estimators)
         self.grad_estimator = gradient_estimator
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
         
-        assert(model_type in ("grm", "gpcm", "normal", "lognormal")) # print error
+        model_types = ("grm", "gpcm", "normal", "lognormal")
+        assert(model_type in model_types), "model_type must be one of {}".format(model_types)
         if model_type == "grm":
             decoder = GradedResponseModel
         elif model_type == "gpcm":

@@ -159,8 +159,9 @@ class GradedBaseModel(nn.Module):
         """
         super(GradedBaseModel, self).__init__()
         
-        assert(not (Q is not None and A is not None)) # print errors at asserts
+        assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
         if Q is not None:
+            assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
             self._loadings = SparseLinear(latent_size, len(n_cats), Q)
         elif A is not None:
             self._loadings = LinearConstraints(latent_size, len(n_cats), A, b)
@@ -285,8 +286,9 @@ class ContinuousBaseModel(nn.Module):
         """
         super(ContinuousBaseModel, self).__init__()
         
-        assert(not (Q is not None and A is not None)) # print errors at asserts
+        assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
         if Q is not None:
+            assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
             self._loadings = SparseLinear(latent_size, n_items, Q)
         elif A is not None:
             self._loadings = LinearConstraints(latent_size, n_items, A, b)
@@ -520,7 +522,7 @@ class VariationalAutoencoder(nn.Module):
             inf_list.append(nn.Linear(inference_net_sizes[-1], int(2 * latent_size)))
             self.inf_net = nn.Sequential(*inf_list)
         else:
-            self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))
+            self.inf_net = nn.Linear(inference_net_sizes[0], int(2 * latent_size))
         
         # Measurement model.
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
@@ -532,10 +534,14 @@ class VariationalAutoencoder(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self):
-        # Check type of inf_net -- if one linear layer, can't index
-        nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
-        nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
-        nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
+        try:
+            nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
+            nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
+            nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
+        except TypeError:
+            nn.init.normal_(self.inf_net.weight, mean=0., std=0.001)
+            nn.init.normal_(self.inf_net.bias[0:self.latent_size], mean=0., std=0.001)
+            nn.init.normal_(self.inf_net.bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
 
     def encode(self,
                y:          torch.Tensor,
