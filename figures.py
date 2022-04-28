@@ -11,7 +11,7 @@ from utils import manual_seed, invert_factors
 
 def screeplot(latent_sizes:             List[int], # need to sort these if they're not + generalize to any factor model
               data:                     torch.Tensor,
-              mirt_model:               str,
+              model_type:               str,
               test_size:                float,
               inference_net_sizes_list: List[List[int]],
               learning_rates:           List[float],
@@ -34,7 +34,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
     Args:
         latent_sizes             (List of int):         Latent dimensions to plot.
         data                     (Tensor):              Data set containing item responses.
-        mirt_model               (str):                 Measurement model type.
+        model_type               (str):                 Measurement model type.
         test_size                (float):               Proportion of data used for calculating LL.
         inference_net_sizes_list (List of List of int): Neural net input and hidden layer sizes for each latent dimension.
         learning_rates           (List of float):       Step sizes for stochastic gradient optimizers.
@@ -63,7 +63,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         print("\nLatent size = ", latent_size, end="\n")
         model = ImportanceWeightedEstimator(learning_rate = learning_rates[idx],
                                             device = device,
-                                            mirt_model = mirt_model,
+                                            model_type = model_type,
                                             log_interval = log_interval,
                                             inference_net_sizes = inference_net_sizes_list[idx],
                                             latent_size = latent_size,

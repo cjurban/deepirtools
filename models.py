@@ -24,7 +24,7 @@ class SparseLinear(nn.Module):
                  out_features: int,
                  Q:            torch.Tensor,
                 ):
-        """Loadings with binary constraints."""
+        """Linear map with binary constraints."""
         super(SparseLinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -56,7 +56,7 @@ class LinearConstraints(nn.Module):
                  A:            torch.Tensor,
                  b:            Optional[torch.Tensor] = None,
                 ):
-        """Loadings with linear constraints."""
+        """Linear map with linear constraints."""
         super(LinearConstraints, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -86,7 +86,7 @@ class CatBiasReshape(nn.Module):
                  n_cats: List[int],
                  mask: Optional[torch.Tensor] = None,
                 ):
-        """Intercepts for graded response models. Reshaping makes computatiton faster."""
+        """Biases (i.e., intercepts) for graded response models. Reshaping makes computatiton faster."""
         super(CatBiasReshape, self).__init__()
         self.n_cats = n_cats
         
@@ -161,26 +161,34 @@ class GradedBaseModel(nn.Module):
         
         assert(not (Q is not None and A is not None)) # print errors at asserts
         if Q is not None:
-            self.loadings = SparseLinear(latent_size, len(n_cats), Q)
+            self._loadings = SparseLinear(latent_size, len(n_cats), Q)
         elif A is not None:
-            self.loadings = LinearConstraints(latent_size, len(n_cats), A, b)
+            self._loadings = LinearConstraints(latent_size, len(n_cats), A, b)
         else:
-            self.loadings = nn.Linear(latent_size, len(n_cats), bias = False)
+            self._loadings = nn.Linear(latent_size, len(n_cats), bias = False)
         self.Q = Q
         self.A = A
         
-        self.intercepts = CatBiasReshape(n_cats, ints_mask)
+        self._intercepts = CatBiasReshape(n_cats, ints_mask)
         self.n_cats = n_cats
         
         self.reset_parameters()
         
     def reset_parameters(self):
         if self.Q is None and self.A is None:
-            nn.init.xavier_uniform_(self.loadings.weight)
+            nn.init.xavier_uniform_(self._loadings.weight)
 
     def forward(self):
         """Compute log p(data | latents)."""
         raise NotImplementedError
+        
+    @property
+    def loadings(self):
+        return self._loadings.weight.data
+    
+    @property
+    def intercepts(self):
+        return self._intercepts.bias.data
     
     
 class GradedResponseModel(GradedBaseModel):
@@ -202,9 +210,9 @@ class GradedResponseModel(GradedBaseModel):
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                ):
-        Bx = self.loadings(x)
-        cum_probs = self.intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
-                                                            torch.Size([max(self.n_cats) - 1]))).sigmoid()
+        Bx = self._loadings(x)
+        cum_probs = self._intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
+                                                             torch.Size([max(self.n_cats) - 1]))).sigmoid()
         upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
         lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
         probs = upper_probs - lower_probs
@@ -237,11 +245,11 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
                ):
         M = max(self.n_cats)
         
-        Bx = self.loadings(x)
+        Bx = self._loadings(x)
         shape = Bx.shape + torch.Size([M])
         kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
         
-        cum_bias = self.intercepts.bias_reshape.cumsum(dim = 1)
+        cum_bias = self._intercepts.bias_reshape.cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
         tmp = kBx - cum_bias
         
@@ -279,15 +287,15 @@ class ContinuousBaseModel(nn.Module):
         
         assert(not (Q is not None and A is not None)) # print errors at asserts
         if Q is not None:
-            self.loadings = SparseLinear(latent_size, n_items, Q)
+            self._loadings = SparseLinear(latent_size, n_items, Q)
         elif A is not None:
-            self.loadings = LinearConstraints(latent_size, n_items, A, b)
+            self._loadings = LinearConstraints(latent_size, n_items, A, b)
         else:
-            self.loadings = nn.Linear(latent_size, n_items, bias = False)
+            self._loadings = nn.Linear(latent_size, n_items, bias = False)
         self.Q = Q
         self.A = A
         
-        self.bias = nn.Parameter(torch.empty(n_items))
+        self._bias = nn.Parameter(torch.empty(n_items))
         self.ints_mask = ints_mask
         
         self.free_phi = nn.Parameter(torch.empty(n_items))
@@ -297,12 +305,31 @@ class ContinuousBaseModel(nn.Module):
     def reset_parameters(self):
         if self.Q is None and self.A is None:
             nn.init.xavier_uniform_(self.loadings.weight)
-        nn.init.normal_(self.bias, mean=0., std=0.001)
+        nn.init.normal_(self._bias, mean=0., std=0.001)
         nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
         
     def forward(self):
         """Compute log p(data | latents)."""
         raise NotImplementedError
+        
+    @property
+    def bias(self):
+        if self.ints_mask is not None:
+            return self.ints_mask * self._bias
+        else:
+            return self._bias
+        
+    @property
+    def residual_variances(self):
+        return F.softplus(self.free_phi) + EPS
+        
+    @property
+    def loadings(self):
+        return self._loadings.weight.data
+        
+    @property
+    def intercepts(self):
+        return self.bias.data
     
     
 class NormalFactorModel(ContinuousBaseModel):
@@ -323,13 +350,9 @@ class NormalFactorModel(ContinuousBaseModel):
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                ):
-        if self.ints_mask is not None:
-            ints = self.ints_mask * self.bias
-        else:
-            ints = self.bias
-        loc = self.loadings(x) + ints
+        loc = self._loadings(x) + self.bias
         
-        py_x = dist.Normal(loc = loc, scale = F.softplus(self.free_phi) + EPS)
+        py_x = dist.Normal(loc = loc, scale = self.residual_variances)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
 
     
@@ -351,13 +374,9 @@ class LogNormalFactorModel(ContinuousBaseModel):
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                ):
-        if self.ints_mask is not None:
-            ints = self.ints_mask * self.bias
-        else:
-            ints = self.bias
-        loc = self.loadings(x) + ints
+        loc = self._loadings(x) + self.bias
         
-        py_x = dist.LogNormal(loc = loc, scale = F.softplus(self.free_phi) + EPS)
+        py_x = dist.LogNormal(loc = loc, scale = self.residual_variances)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
             
     
@@ -545,7 +564,7 @@ class VariationalAutoencoder(nn.Module):
                 iw_samples:     int = 1,
                ):
         """
-        Compute variational lower bound (ELBO).
+        Compute evidence lower bound (ELBO).
         
         Args:
             y              (Tensor): Observed data.

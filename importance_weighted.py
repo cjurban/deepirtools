@@ -15,7 +15,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
     def __init__(self,
                  learning_rate:       float,
                  device:              str,
-                 mirt_model:          str,
+                 model_type:          str,
                  gradient_estimator:  str = "dreg",
                  log_interval:        int = 100,
                  verbose:             bool = True,
@@ -27,7 +27,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
         Args:
             learning_rate       (float): Step size for stochastic gradient optimizer.
             device              (str):   Computing device used for fitting.
-            mirt_model          (str):   Measurement model type. Current options are:
+            model_type          (str):   Measurement model type. Current options are:
                                              "grm"       = graded response model
                                              "gpcm"      = generalized partial credit model
                                              "normal"    = normal factor model
@@ -45,14 +45,14 @@ class ImportanceWeightedEstimator(BaseEstimator):
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
         
-        assert(mirt_model in ("grm", "gpcm", "normal", "lognormal")) # print error
-        if mirt_model == "grm":
+        assert(model_type in ("grm", "gpcm", "normal", "lognormal")) # print error
+        if model_type == "grm":
             decoder = GradedResponseModel
-        elif mirt_model == "gpcm":
+        elif model_type == "gpcm":
             decoder = GeneralizedPartialCreditModel
-        elif mirt_model == "normal":
+        elif model_type == "normal":
             decoder = NormalFactorModel
-        elif mirt_model == "lognormal":
+        elif model_type == "lognormal":
             decoder = LogNormalFactorModel
         self.model = VariationalAutoencoder(decoder=decoder, device=device, **model_kwargs)
         self.optimizer = optim.Adam([{"params" : self.model.parameters()}],
@@ -159,13 +159,29 @@ class ImportanceWeightedEstimator(BaseEstimator):
         return torch.cat(scores, dim = 0)
         
     @property
-    def loadings(self): # need to check this exists
-        return self.model.decoder.loadings.weight.data # need to define this property in decoder?
+    def loadings(self):
+        try:
+            return self.model.decoder.loadings
+        except AttributeError:
+            return None
     
     @property
-    def intercepts(self): # need to check this exists
-        return self.model.decoder.intercepts.bias.data
+    def intercepts(self):
+        try:
+            return self.model.decoder.intercepts
+        except AttributeError:
+            return None
+        
+    @property
+    def residual_variances(self):
+        try:
+            return self.model.decoder.residual_variances.data
+        except AttributeError:
+            return None
     
     @property
-    def cov(self): # need to check this exists
-        return self.model.cholesky.cov.data
+    def cov(self):
+        try:
+            return self.model.cholesky.cov.data
+        except AttributeError:
+            return None
