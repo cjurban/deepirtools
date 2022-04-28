@@ -136,7 +136,7 @@ class CatBiasReshape(nn.Module):
 ################################################################################
     
 
-class GradedResponseModel(nn.Module):
+class GradedBaseModel(nn.Module):
     
     def __init__(self,
                  latent_size: int,
@@ -147,7 +147,7 @@ class GradedResponseModel(nn.Module):
                  ints_mask:   Optional[torch.Tensor] = None,
                 ):
         """
-        Samejima's graded response model.
+        Base model for graded responses.
         
         Args:
             latent_size (int):         Number of latent variables.
@@ -155,11 +155,10 @@ class GradedResponseModel(nn.Module):
             Q           (Tensor):      Binary matrix indicating measurement structure.
             A           (Tensor):      Matrix imposing linear constraints on loadings.
             b           (Tensor):      Vector imposing linear constraints on loadings.
-            ints_mask   (Tensor):      Vector constraining intercepts to fixed values.
+            ints_mask   (Tensor):      Vector constraining specific intercepts to zero.
         """
-        super(GradedResponseModel, self).__init__()
+        super(GradedBaseModel, self).__init__()
         
-        # Loadings.
         assert(not (Q is not None and A is not None)) # print errors at asserts
         if Q is not None:
             self.loadings = SparseLinear(latent_size, len(n_cats), Q)
@@ -170,7 +169,6 @@ class GradedResponseModel(nn.Module):
         self.Q = Q
         self.A = A
         
-        # Intercepts.
         self.intercepts = CatBiasReshape(n_cats, ints_mask)
         self.n_cats = n_cats
         
@@ -180,24 +178,35 @@ class GradedResponseModel(nn.Module):
         if self.Q is None and self.A is None:
             nn.init.xavier_uniform_(self.loadings.weight)
 
+    def forward(self):
+        """Compute log p(data | latents)."""
+        raise NotImplementedError
+    
+    
+class GradedResponseModel(GradedBaseModel):
+    
+    def __init__(self,
+                 latent_size: int,
+                 n_cats:      List[int],
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        """Samejima's graded response model."""
+        super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask)
+
     def forward(self,
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
                ):
-        """
-        Compute log p(data | latents).
-        
-        Args:
-            x    (Tensor): Latent variables.
-            y    (Tensor): Item responses.
-            mask (Tensor): Binary mask indicating missing item responses.
-        """
         Bx = self.loadings(x)
         cum_probs = self.intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
-                                                                 torch.Size([max(self.n_cats) - 1]))).sigmoid()
-        upper_probs = F.pad(cum_probs, (0, 1), value=1.)
-        lower_probs = F.pad(cum_probs, (1, 0), value=0.)
+                                                            torch.Size([max(self.n_cats) - 1]))).sigmoid()
+        upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
+        lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
         probs = upper_probs - lower_probs
         
         idxs = y.long().expand(probs[..., -1].shape).unsqueeze(-1)
@@ -206,17 +215,150 @@ class GradedResponseModel(nn.Module):
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
     
-
-class LogNormalModel(nn.Module):
     
-        def __init__(self,
+class GeneralizedPartialCreditModel(GradedBaseModel):
+    
+    def __init__(self,
                  latent_size: int,
+                 n_cats:      List[int],
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
                 ):
+        """Generalized partial credit model."""
+        super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask)
+
+    def forward(self,
+                x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+               ):
+        M = max(self.n_cats)
+        
+        Bx = self.loadings(x)
+        shape = Bx.shape + torch.Size([M])
+        kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
+        
+        cum_bias = self.intercepts.bias_reshape.cumsum(dim = 1)
+        cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
+        tmp = kBx - cum_bias
+        
+        log_py_x = tmp - (tmp).logsumexp(dim = -1, keepdim = True)
+        
+        idxs = y.long().expand(log_py_x[..., -1].shape).unsqueeze(-1)
+        log_py_x = -torch.gather(log_py_x, dim = -1, index = idxs).squeeze(-1)
+        if mask is not None:
+            log_py_x = log_py_x.mul(mask)
+        return log_py_x.sum(dim = -1, keepdim = True)
+    
+    
+class ContinuousBaseModel(nn.Module):
+    
+    def __init__(self,
+                 latent_size: int,
+                 n_items:     int,
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        """
+        Base model for continuous responses.
+        
+        Args:
+            latent_size (int):         Number of latent variables.
+            n_items     (int):         Number of items.
+            Q           (Tensor):      Binary matrix indicating measurement structure.
+            A           (Tensor):      Matrix imposing linear constraints on loadings.
+            b           (Tensor):      Vector imposing linear constraints on loadings.
+            ints_mask   (Tensor):      Vector constraining specific intercepts to zero.
+        """
+        super(ContinuousBaseModel, self).__init__()
+        
+        assert(not (Q is not None and A is not None)) # print errors at asserts
+        if Q is not None:
+            self.loadings = SparseLinear(latent_size, n_items, Q)
+        elif A is not None:
+            self.loadings = LinearConstraints(latent_size, n_items, A, b)
+        else:
+            self.loadings = nn.Linear(latent_size, n_items, bias = False)
+        self.Q = Q
+        self.A = A
+        
+        self.bias = nn.Parameter(torch.empty(n_items))
+        self.ints_mask = ints_mask
+        
+        self.free_phi = nn.Parameter(torch.empty(n_items))
+        
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        if self.Q is None and self.A is None:
+            nn.init.xavier_uniform_(self.loadings.weight)
+        nn.init.normal_(self.bias, mean=0., std=0.001)
+        nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
+        
+    def forward(self):
+        """Compute log p(data | latents)."""
+        raise NotImplementedError
+    
+    
+class NormalFactorModel(ContinuousBaseModel):
+    
+    def __init__(self,
+                 latent_size: int,
+                 n_items:     int,
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask)
             
-            self.beta = nn.Parameter(torch.zeros(latent_size))
-            self.free_alpha = nn.Parameter(torch.empty(latent_size))
+    def forward(self,
+                x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+               ):
+        if self.ints_mask is not None:
+            ints = self.ints_mask * self.bias
+        else:
+            ints = self.bias
+        loc = self.loadings(x) + ints
+        
+        py_x = dist.Normal(loc = loc, scale = F.softplus(self.free_phi) + EPS)
+        return -py_x.log_prob(y).sum(-1, keepdim = True)
+
+    
+class LogNormalFactorModel(ContinuousBaseModel):
+    
+    def __init__(self,
+                 latent_size: int,
+                 n_items:     int,
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask)
             
-            # TODO: Finish
+    def forward(self,
+                x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+               ):
+        if self.ints_mask is not None:
+            ints = self.ints_mask * self.bias
+        else:
+            ints = self.bias
+        loc = self.loadings(x) + ints
+        
+        py_x = dist.LogNormal(loc = loc, scale = F.softplus(self.free_phi) + EPS)
+        return -py_x.log_prob(y).sum(-1, keepdim = True)
             
     
 ################################################################################
@@ -328,8 +470,7 @@ class Spherical(nn.Module):
 class VariationalAutoencoder(nn.Module):
     
     def __init__(self,
-                 decoder,               
-                 input_size:            int,
+                 decoder,
                  inference_net_sizes:   List[int],
                  latent_size:           int,
                  device:                str,
@@ -342,8 +483,9 @@ class VariationalAutoencoder(nn.Module):
         
         Args:
             decoder             (nn.Module):   Measurement model whose forward() method returns log p(data | latents).
-            input_size          (int):         Number of observed variables.
-            inference_net_sizes (List of int): Neural network hidden layer dimensions.
+            inference_net_sizes (List of int): Neural network input and hidden layer dimensions.
+                                                   E.g., a neural network with input size 50 and two hidden layers of
+                                                   size 100 has inference_net_sizes = [50, 100, 100]
             latent_size         (int):         Number of latent variables.
             device              (str):         Computing device used for fitting.
             fixed_variances     (bool):        Whether to constrain latent variances to one.
@@ -353,11 +495,10 @@ class VariationalAutoencoder(nn.Module):
         super(VariationalAutoencoder, self).__init__()
         
         # Inference model neural network.
-        inf_sizes = [input_size] + inference_net_sizes
         inf_list = list(chain.from_iterable((nn.Linear(size1, size2), nn.ELU()) for size1, size2 in
-                        zip(inf_sizes[0:-1], inf_sizes[1:])))
+                        zip(inference_net_sizes[0:-1], inference_net_sizes[1:])))
         if inf_list != []:
-            inf_list.append(nn.Linear(inf_sizes[-1], int(2 * latent_size)))
+            inf_list.append(nn.Linear(inference_net_sizes[-1], int(2 * latent_size)))
             self.inf_net = nn.Sequential(*inf_list)
         else:
             self.inf_net = nn.Linear(inf_sizes[0], int(2 * latent_size))

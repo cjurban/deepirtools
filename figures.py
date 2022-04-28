@@ -9,9 +9,9 @@ from importance_weighted import ImportanceWeightedEstimator
 from utils import manual_seed, invert_factors
 
 
-def screeplot(latent_sizes:             List[int], # need to sort these if they're not
+def screeplot(latent_sizes:             List[int], # need to sort these if they're not + generalize to any factor model
               data:                     torch.Tensor,
-              n_cats:                   List[int],
+              mirt_model:               str,
               test_size:                float,
               inference_net_sizes_list: List[List[int]],
               learning_rates:           List[float],
@@ -26,6 +26,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
               xlabel:                   str = "Number of Factors",
               ylabel:                   str = "Predicted Approximate Negative Log-Likelihood",
               title:                    str = "Approximate Log-Likelihood Scree Plot",
+              **model_kwargs,          
              ):
     """
     In exploratory setting, make log-likelihood screeplot to detect number of latent factors.
@@ -33,9 +34,9 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
     Args:
         latent_sizes             (List of int):         Latent dimensions to plot.
         data                     (Tensor):              Data set containing item responses.
-        n_cats                   (List of int):         Number of categories for each item.
+        mirt_model               (str):                 Measurement model type.
         test_size                (float):               Proportion of data used for calculating LL.
-        inference_net_sizes_list (List of List of int): Neural net hidden layer sizes for each latent dimension.
+        inference_net_sizes_list (List of List of int): Neural net input and hidden layer sizes for each latent dimension.
         learning_rates           (List of float):       Step sizes for stochastic gradient optimizers.
         missing_mask             (Tensor):              Binary mask indicating missing item responses.
         max_epochs               (int):                 Number of passes through the full data set after which
@@ -46,6 +47,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         iw_samples_fit           (int):                 Number of importance-weight samples for fitting.
         iw_samples_ll            (int):                 Number of importance-weight samples for calculating LL.
         random_seed              (int):                 Seed for reproducibility.
+        model_kwargs             (dict):                Named parameters passed to VariationalAutoencoder.__init__().
     """
     assert(test_size > 0 and test_size < 1)
     data_size = data.size(0)
@@ -61,11 +63,11 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         print("\nLatent size = ", latent_size, end="\n")
         model = ImportanceWeightedEstimator(learning_rate = learning_rates[idx],
                                             device = device,
+                                            mirt_model = mirt_model,
                                             log_interval = log_interval,
-                                            input_size = n_items,
                                             inference_net_sizes = inference_net_sizes_list[idx],
                                             latent_size = latent_size,
-                                            n_cats = n_cats,
+                                            **model_kwargs,
                                            )
         model.fit(data_train, batch_size, mask_train, max_epochs, iw_samples = iw_samples_fit)
 
