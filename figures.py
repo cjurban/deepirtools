@@ -2,14 +2,13 @@ import torch
 import numpy as np
 from typing import List, Optional
 import matplotlib.pyplot as plt
-import matplotlib.backends.backend_pdf
 from pylab import *
 
 from importance_weighted import ImportanceWeightedEstimator
 from utils import manual_seed, invert_factors
 
 
-def screeplot(latent_sizes:             List[int], # need to sort these if they're not + generalize to any factor model
+def screeplot(latent_sizes:             List[int], # need to sort these if they're not
               data:                     torch.Tensor,
               model_type:               str,
               test_size:                float,
@@ -54,10 +53,13 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
     assert(test_size > 0 and test_size < 1), "Test size must be between 0 and 1."
     data_size = data.size(0)
     n_items = data.size(1)
+    
     train_idxs = torch.multinomial(torch.ones(data_size), int(ceil((1 - test_size) * data_size)))
     test_idxs = np.setdiff1d(range(data_size), train_idxs)
     data_train = data[train_idxs]; mask_train = missing_mask[train_idxs]
     data_test = data[test_idxs]; mask_test = missing_mask[test_idxs]
+    
+    latent_sizes.sort()
             
     manual_seed(random_seed)
     ll_list = []
@@ -81,17 +83,15 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
     fig.set_size_inches(5, 5, forward = True)
     fig.set_size_inches(5, 5, forward = True)
     
-    ax.plot(latent_sizes, [ll for ll in ll_list], "k-o")
+    ax.plot(latent_sizes, [-ll for ll in ll_list], "k-o")
     
     ax.set_xticks(np.arange(min(latent_sizes) - 1, max(latent_sizes) + 2).tolist())
     ax.set_ylabel(ylabel)
     ax.set_xlabel(xlabel)
     fig.suptitle(title)
-    fig.show()
 
-    pdf = matplotlib.backends.backend_pdf.PdfPages("scree_plot.pdf")
-    pdf.savefig(fig, dpi = 300)
-    pdf.close()
+    fig.savefig("screeplot.pdf")
+    fig.show()
     
     return ll_list
 

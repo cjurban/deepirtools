@@ -118,7 +118,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
         print("\nComputing approx. LL", end="")
         
         start = timeit.default_timer()
-        ll = self.test(loader, mc_samples = mc_samples, iw_samples = iw_samples)
+        ll = -self.test(loader, mc_samples = mc_samples, iw_samples = iw_samples)
         stop = timeit.default_timer()
         self.timerecords["log_likelihood"] = stop - start
         print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
@@ -132,7 +132,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
                data:         torch.Tensor,
                missing_mask: Optional[torch.Tensor] = None,
                mc_samples:   int = 1,
-               iw_samples:   int = 1,
+               iw_samples:   int = 5000,
               ):
         
         loader = torch.utils.data.DataLoader(
@@ -175,9 +175,9 @@ class ImportanceWeightedEstimator(BaseEstimator):
             return None
         
     @property
-    def residual_variances(self):
+    def residual_std(self):
         try:
-            return self.model.decoder.residual_variances.data
+            return self.model.decoder.residual_std.data
         except AttributeError:
             return None
     

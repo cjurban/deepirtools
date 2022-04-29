@@ -97,10 +97,12 @@ class CatBiasReshape(nn.Module):
         idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
         bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
                                                 idx, n_cat in zip(idxs[:-1], n_cats)]))
+        
+        # Appending large values below numerically saturates exponentials.
         bias_reshape, sliced_bias = self._reshape(bias, idxs, 9999.)
         self.bias_reshape = nn.Parameter(bias_reshape)
         if mask is not None:
-            self.mask = self._reshape(mask, idxs, 0., False)
+            self.mask = self._reshape(mask, idxs, 1., False)
         
         # Drop indices.
         nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
@@ -126,7 +128,7 @@ class CatBiasReshape(nn.Module):
     
     @property
     def bias(self):
-        return self.bias_reshape.view(-1)[self.drop_idxs] * self.mask.view(-1)
+        return (self.bias_reshape.view(-1) * self.mask.view(-1))[self.drop_idxs]
 
     
 ################################################################################
@@ -322,7 +324,7 @@ class ContinuousBaseModel(nn.Module):
             return self._bias
         
     @property
-    def residual_variances(self):
+    def residual_std(self):
         return F.softplus(self.free_phi) + EPS
         
     @property
@@ -354,7 +356,7 @@ class NormalFactorModel(ContinuousBaseModel):
                ):
         loc = self._loadings(x) + self.bias
         
-        py_x = dist.Normal(loc = loc, scale = self.residual_variances)
+        py_x = dist.Normal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
 
     
@@ -378,7 +380,7 @@ class LogNormalFactorModel(ContinuousBaseModel):
                ):
         loc = self._loadings(x) + self.bias
         
-        py_x = dist.LogNormal(loc = loc, scale = self.residual_variances)
+        py_x = dist.LogNormal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
             
     
