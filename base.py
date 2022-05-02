@@ -69,7 +69,7 @@ class BaseEstimator():
                           "Iter. = {:6d}".format(self.global_iter),
                           "  Current mean loss = {:5.2f}".format(cur_mean_loss),
                           "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
-                          end = "\r")
+                          end = "                       \r")
                     
     def step(self,
              batch,

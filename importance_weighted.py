@@ -1,5 +1,5 @@
 import torch
-from torch import optim
+from torch.optim import Adam
 import math
 import timeit
 from factor_analyzer import Rotator
@@ -57,9 +57,8 @@ class ImportanceWeightedEstimator(BaseEstimator):
         elif model_type == "lognormal":
             decoder = LogNormalFactorModel
         self.model = VariationalAutoencoder(decoder=decoder, device=device, **model_kwargs)
-        self.optimizer = optim.Adam([{"params" : self.model.parameters()}],
-                                    lr = learning_rate,
-                                    amsgrad = True)
+        self.optimizer = Adam([{"params" : self.model.parameters()}],
+                                lr = learning_rate, amsgrad = True)
         self.timerecords = {}
                         
     def loss_function(self,

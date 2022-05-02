@@ -98,8 +98,8 @@ class CatBiasReshape(nn.Module):
         bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
                                                 idx, n_cat in zip(idxs[:-1], n_cats)]))
         
-        # Appending large values below numerically saturates exponentials.
-        bias_reshape, sliced_bias = self._reshape(bias, idxs, 9999.)
+        # Infinity saturates exponentials.
+        bias_reshape, sliced_bias = self._reshape(bias, idxs, float("inf"))
         self.bias_reshape = nn.Parameter(bias_reshape)
         if mask is not None:
             self.mask = self._reshape(mask, idxs, 1., False)
