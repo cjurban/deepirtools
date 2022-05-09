@@ -3,7 +3,6 @@ import numpy as np
 from typing import List, Optional
 import matplotlib.pyplot as plt
 from pylab import *
-
 from importance_weighted import ImportanceWeightedEstimator
 from utils import manual_seed, invert_factors
 
@@ -51,11 +50,11 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
         model_kwargs             (dict):                Named parameters passed to VariationalAutoencoder.__init__().
     """
     assert(test_size > 0 and test_size < 1), "Test size must be between 0 and 1."
-    data_size = data.size(0)
+    sample_size = data.size(0)
     n_items = data.size(1)
     
-    train_idxs = torch.multinomial(torch.ones(data_size), int(ceil((1 - test_size) * data_size)))
-    test_idxs = np.setdiff1d(range(data_size), train_idxs)
+    train_idxs = torch.multinomial(torch.ones(sample_size), int(ceil((1 - test_size) * sample_size)))
+    test_idxs = np.setdiff1d(range(sample_size), train_idxs)
     data_train = data[train_idxs]; mask_train = missing_mask[train_idxs]
     data_test = data[test_idxs]; mask_test = missing_mask[test_idxs]
     
@@ -70,6 +69,7 @@ def screeplot(latent_sizes:             List[int], # need to sort these if they'
                                             model_type = model_type,
                                             gradient_estimator = gradient_estimator,
                                             log_interval = log_interval,
+                                            input_size = n_items,
                                             inference_net_sizes = inference_net_sizes_list[idx],
                                             latent_size = latent_size,
                                             **model_kwargs,

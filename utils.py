@@ -4,6 +4,7 @@ from torch import nn
 from torch.utils.data import Dataset
 import numpy as np
 from typing import List, Optional
+from itertools import chain
 
 
 def manual_seed(seed: int):
@@ -11,6 +12,55 @@ def manual_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    
+    
+class ConvergenceChecker():
+    
+    def __init__(self, n_intervals = 100, log_interval = 1):
+        self.n_intervals = n_intervals
+        self.log_interval = log_interval
+        self.converged = False
+        self.best_avg_loss = None
+        self.loss_list = []
+        self.loss_improvement_counter = 0
+    
+    def check_convergence(self, epoch, global_step, loss):
+        self.loss_list.append(loss)
+        if len(self.loss_list) > 100:
+            self.loss_list.pop(0)
+        if (global_step - 1) % 100 == 0 and global_step != 1:
+            cur_mean_loss = np.mean(self.loss_list)
+            if self.best_avg_loss is None:
+                self.best_avg_loss = cur_mean_loss
+            elif cur_mean_loss < self.best_avg_loss:
+                self.best_avg_loss = cur_mean_loss
+                if self.loss_improvement_counter >= 1:
+                    self.loss_improvement_counter = 0
+            elif cur_mean_loss >= self.best_avg_loss:
+                self.loss_improvement_counter += 1
+                if self.loss_improvement_counter >= self.n_intervals:
+                    self.converged = True
+        if (global_step - 1) % self.log_interval == 0:
+            print("\rEpoch = {:7d}".format(epoch),
+                  "Iter. = {:6d}".format(global_step),
+                  "Cur. loss = {:7.2f}".format(loss),
+                  "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
+                  end = "")
+        if self.converged:
+            print("\n")
+            
+            
+def get_net(net_sizes: List[int],
+            out_size:  int,
+           ):
+    net_list = list(chain.from_iterable((nn.Linear(size1, size2), nn.ELU()) for size1, size2 in
+                    zip(net_sizes[0:-1], net_sizes[1:])))
+    if net_list != []:
+        net_list.append(nn.Linear(net_sizes[-1], out_size))
+        net = nn.Sequential(*net_list)
+    else:
+        net = nn.Linear(net_sizes[0], out_size)
+    return net
 
 
 def sigmoid(x):

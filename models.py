@@ -2,7 +2,9 @@ import math
 import torch
 from torch import nn
 import torch.nn.functional as F
-import torch.distributions as dist
+import pyro.distributions as pydist
+import pyro.distributions.transforms as T
+from pyro.nn import DenseNN
 from utils import *
 from typing import List, Optional
 from itertools import chain
@@ -356,7 +358,7 @@ class NormalFactorModel(ContinuousBaseModel):
                ):
         loc = self._loadings(x) + self.bias
         
-        py_x = dist.Normal(loc = loc, scale = self.residual_std)
+        py_x = pydist.Normal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
 
     
@@ -380,7 +382,7 @@ class LogNormalFactorModel(ContinuousBaseModel):
                ):
         loc = self._loadings(x) + self.bias
         
-        py_x = dist.LogNormal(loc = loc, scale = self.residual_std)
+        py_x = pydist.LogNormal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
             
     
@@ -481,6 +483,29 @@ class Spherical(nn.Module):
                                         self.weight)
         else:
             return torch.eye(self.size, device=self.device)
+        
+        
+def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=5.):
+    """Modification of Pyro's spline_coupling() to use ELU activations."""
+    if split_dim is None:
+        split_dim = input_dim // 2
+
+    if hidden_dims is None:
+        hidden_dims = [input_dim * 10, input_dim * 10]
+
+    net = DenseNN(
+        split_dim,
+        hidden_dims,
+        param_dims=[
+            (input_dim - split_dim) * count_bins,
+            (input_dim - split_dim) * count_bins,
+            (input_dim - split_dim) * (count_bins - 1),
+            (input_dim - split_dim) * count_bins,
+        ],
+        nonlinearity=nn.ELU(),
+    )
+
+    return T.SplineCoupling(input_dim, split_dim, net, count_bins, bound)
 
         
 ################################################################################
@@ -494,11 +519,13 @@ class VariationalAutoencoder(nn.Module):
     
     def __init__(self,
                  decoder,
+                 input_size:            int,
                  inference_net_sizes:   List[int],
                  latent_size:           int,
                  device:                str,
                  fixed_variances:       bool = True,
                  correlated_factors:    List[int] = [],
+                 use_spline_prior:      bool = False,
                  **decoder_kwargs,
                 ):
         """
@@ -506,44 +533,45 @@ class VariationalAutoencoder(nn.Module):
         
         Args:
             decoder             (nn.Module):   Measurement model whose forward() method returns log p(data | latents).
+            input_size          (int):         Neural network input dimension.
             inference_net_sizes (List of int): Neural network input and hidden layer dimensions.
-                                                   E.g., a neural network with input size 50 and two hidden layers of
-                                                   size 100 has inference_net_sizes = [50, 100, 100]
+                                                   E.g., a neural network with two hidden layers of size 100
+                                                   has inference_net_sizes = [100, 100]
             latent_size         (int):         Number of latent variables.
             device              (str):         Computing device used for fitting.
             fixed_variances     (bool):        Whether to constrain latent variances to one.
             correlated_factors  (List of int): Which latent variables should be correlated.
+            use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
             decoder_kwargs      (dict):        Named parameters passed to decoder.__init__().
         """
         super(VariationalAutoencoder, self).__init__()
         
         # Inference model neural network.
-        inf_list = list(chain.from_iterable((nn.Linear(size1, size2), nn.ELU()) for size1, size2 in
-                        zip(inference_net_sizes[0:-1], inference_net_sizes[1:])))
-        if inf_list != []:
-            inf_list.append(nn.Linear(inference_net_sizes[-1], int(2 * latent_size)))
-            self.inf_net = nn.Sequential(*inf_list)
-        else:
-            self.inf_net = nn.Linear(inference_net_sizes[0], int(2 * latent_size))
-        
+        self.inf_net = DenseNN(input_size, inference_net_sizes, [int(2 * latent_size)], nonlinearity = nn.ELU())
+                
         # Measurement model.
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
         # Latent prior.
-        self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors, device)
+        assert(not ((not fixed_variances or correlated_factors != []) and use_spline_prior)), ""
+        if use_spline_prior:
+            if latent_size == 1:
+                self.flow = T.Spline(1, count_bins=16, bound=5.)
+            else:
+                self.flow1 = T.spline_coupling(latent_size)
+                self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
+                self.flow3 = T.spline_coupling(latent_size)
+        else:
+            self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors, device)
         self.latent_size = latent_size
+        self.use_spline_prior = use_spline_prior
         
         self.reset_parameters()
         
     def reset_parameters(self):
-        try:
-            nn.init.normal_(self.inf_net[-1].weight, mean=0., std=0.001)
-            nn.init.normal_(self.inf_net[-1].bias[0:self.latent_size], mean=0., std=0.001)
-            nn.init.normal_(self.inf_net[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
-        except TypeError:
-            nn.init.normal_(self.inf_net.weight, mean=0., std=0.001)
-            nn.init.normal_(self.inf_net.bias[0:self.latent_size], mean=0., std=0.001)
-            nn.init.normal_(self.inf_net.bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
+        nn.init.normal_(self.inf_net.layers[-1].weight, mean=0., std=0.001)
+        nn.init.normal_(self.inf_net.layers[-1].bias[0:self.latent_size], mean=0., std=0.001)
+        nn.init.normal_(self.inf_net.layers[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
 
     def encode(self,
                y:          torch.Tensor,
@@ -590,18 +618,28 @@ class VariationalAutoencoder(nn.Module):
         log_py_x = self.decoder(x, y, mask)
         
         # Log p(x).
-        if self.cholesky.correlated_factors != []:
-            log_px = dist.MultivariateNormal(torch.zeros_like(x, device = x.device),
-                                             scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+        if self.use_spline_prior:
+            base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
+            x_mean, x_dispersion = x.mean(dim = -1, keepdim = True).detach(), x.std(dim = -1, keepdim = True).pow(-1).detach()
+            affine_transform = T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion)
+            if self.latent_size == 1:
+                px = pydist.TransformedDistribution(base_dist, [self.flow, affine_transform])
+            else:
+                px = pydist.TransformedDistribution(base_dist, [self.flow1, self.flow2, self.flow3, affine_transform])
+            log_px = px.log_prob(x).unsqueeze(-1)
         else:
-            log_px = dist.Normal(torch.zeros_like(x, device = x.device),
-                                 torch.ones_like(x, device = x.device)).log_prob(x).sum(-1, keepdim = True)
+            if self.cholesky.correlated_factors != []:
+                log_px = pydist.MultivariateNormal(torch.zeros_like(x, device = x.device),
+                                                 scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+            else:
+                log_px = pydist.Normal(torch.zeros_like(x, device = x.device),
+                                     torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
             
         # Log q(x | y).
         if iw_samples > 1 and grad_estimator == "dreg":
-            qx_y = dist.Normal(mu.detach(), std.detach())
+            qx_y = pydist.Normal(mu.detach(), std.detach())
         else:
-            qx_y = dist.Normal(mu, std)
+            qx_y = pydist.Normal(mu, std)
         log_qx_y = qx_y.log_prob(x).sum(dim = -1, keepdim = True)
         
         elbo = log_py_x + log_qx_y - log_px

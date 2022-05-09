@@ -4,8 +4,7 @@ import numpy as np
 import os
 import timeit
 from typing import List, Optional
-
-from utils import tensor_dataset
+from utils import ConvergenceChecker, tensor_dataset
 
 
 class BaseEstimator():
@@ -24,52 +23,18 @@ class BaseEstimator():
             verbose      (bool): Whether to print updates during fitting.
         """
         self.device = device
-        self.log_interval = log_interval
         self.verbose = verbose
 
         self.global_iter = 0
-        self.converged = False
-        self.loss_list = []
-        self.best_avg_loss = None
-        self.loss_improvement_counter = 0
+        self.checker = ConvergenceChecker(log_interval = log_interval)
         
         self.model = None
         self.optimizer = None
         self.runtime_kwargs = {}
+        self.timerecords = {}
 
     def loss_function(self):
         raise NotImplementedError
-
-    def check_convergence(self,
-                          loss:  float,
-                          epoch: int,
-                         ):
-        cur_mean_loss = None
-        
-        self.loss_list.append(loss.item())
-        if len(self.loss_list) > 100:
-            self.loss_list.pop(0)
-            
-        if (self.global_iter - 1) % 100 == 0 and self.global_iter != 1:
-            cur_mean_loss = np.mean(self.loss_list)
-
-            if self.best_avg_loss is None:
-                self.best_avg_loss = cur_mean_loss
-            elif cur_mean_loss < self.best_avg_loss:
-                self.best_avg_loss = cur_mean_loss
-                if self.loss_improvement_counter >= 1:
-                    self.loss_improvement_counter = 0
-            elif cur_mean_loss >= self.best_avg_loss:
-                self.loss_improvement_counter += 1
-                if self.loss_improvement_counter >= 100:
-                    self.converged = True
-            if (self.global_iter - 1) % self.log_interval == 0: # issue here -- log_interval multiple/divisble by 100?
-                if self.verbose:
-                    print("Epoch = {:7d}".format(epoch),
-                          "Iter. = {:6d}".format(self.global_iter),
-                          "  Current mean loss = {:5.2f}".format(cur_mean_loss),
-                          "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
-                          end = "                       \r")
                     
     def step(self,
              batch,
@@ -104,7 +69,7 @@ class BaseEstimator():
         train_loss = 0
 
         for batch_idx, batch in enumerate(train_loader):
-            if not self.converged:
+            if not self.checker.converged:
                 self.global_iter += 1 
                 loss = self.step(batch, **model_kwargs)
                 
@@ -112,10 +77,10 @@ class BaseEstimator():
                     print(("\nNaN loss obtained, ending fitting. "
                            "Consider increasing batch size or reducing learning rate."),
                           end = "\n")
-                    self.converged = True
+                    self.checker.converged = True
                     break
                     
-                self.check_convergence(loss, epoch)
+                self.checker.check_convergence(epoch, self.global_iter, loss.item())
             else:
                 break
 
@@ -163,11 +128,11 @@ class BaseEstimator():
                         )
         
         epoch = 0
-        while not self.converged:
+        while not self.checker.converged:
             self.train(train_loader, epoch, **model_kwargs)
 
             epoch += 1
-            if epoch == max_epochs and not self.converged:
+            if epoch == max_epochs and not self.checker.converged:
                 print("\nFailed to converge within " + str(max_epochs) + " epochs.")
                 break
                 
