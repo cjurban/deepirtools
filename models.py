@@ -564,6 +564,7 @@ class VariationalAutoencoder(nn.Module):
         else:
             self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors, device)
         self.latent_size = latent_size
+        self.fixed_variances = fixed_variances
         self.use_spline_prior = use_spline_prior
         
         self.reset_parameters()
@@ -620,12 +621,14 @@ class VariationalAutoencoder(nn.Module):
         # Log p(x).
         if self.use_spline_prior:
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
-            x_mean, x_dispersion = x.mean(dim = -1, keepdim = True).detach(), x.std(dim = -1, keepdim = True).pow(-1).detach()
-            affine_transform = T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion)
             if self.latent_size == 1:
-                px = pydist.TransformedDistribution(base_dist, [self.flow, affine_transform])
+                flows = [self.flow]
             else:
-                px = pydist.TransformedDistribution(base_dist, [self.flow1, self.flow2, self.flow3, affine_transform])
+                flows = [self.flow1, self.flow2, self.flow3]
+            if self.fixed_variances:
+                x_mean, x_dispersion = x.mean(dim = -2, keepdim = True).detach(), x.std(dim = -2, keepdim = True).pow(-1).detach()
+                flows.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
+            px = pydist.TransformedDistribution(base_dist, flows)
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
             if self.cholesky.correlated_factors != []:
