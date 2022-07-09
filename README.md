@@ -1,1 +1,1 @@
-# Deep IRTools
+# DeepIRTools
