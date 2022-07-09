@@ -7,7 +7,7 @@ from importance_weighted import ImportanceWeightedEstimator
 from utils import manual_seed, invert_factors
 
 
-def screeplot(latent_sizes:             List[int], # need to sort these if they're not
+def screeplot(latent_sizes:             List[int],
               data:                     torch.Tensor,
               model_type:               str,
               test_size:                float,
