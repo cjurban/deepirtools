@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=40.8.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deepirtools"
+version = "1.0.8"
+description = "Deep learning-based estimation and goodness-of-fit for item response theory models."
+dependencies = [
+    'torch>=1.10.0',
+    'pyro-ppl>=1.8.0',
+    'numpy>=1.22.4'
+]
+requires-python = ">=3.6"
+
+[project.urls]
+Homepage = "https://github.com/cjurban/DeepIRTools"
