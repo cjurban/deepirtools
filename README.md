@@ -8,7 +8,7 @@ DeepIRTools is a small Python package that uses scalable deep learning methods (
 
 ### Tutorial
 
-[`examples/big_5_tutorial.ipynb`](examples/big_5_tutoral.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data. 
+[`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data. 
 
 ## References
 
