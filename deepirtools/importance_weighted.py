@@ -2,7 +2,6 @@ import torch
 from torch.optim import Adam
 import math
 import timeit
-from factor_analyzer import Rotator
 from typing import List, Optional
 from base import BaseEstimator
 from models import *
