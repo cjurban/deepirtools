@@ -110,8 +110,7 @@ class CatBiasReshape(nn.Module):
         nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
                                     value=float("nan")).unsqueeze(0) for
                                     _slice in sliced_bias], axis = 0)
-        cum_probs_mask = nan_mask * 0. + 1.
-        self.drop_idxs = ~cum_probs_mask.view(-1).isnan().to(mask.device)
+        self.drop_idxs = ~nan_mask.view(-1).isnan().to(mask.device)
         
     def _reshape(self, t, idxs, pad_val, return_slices=True):
         sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
