@@ -31,8 +31,25 @@ The following (multidimensional) latent factor models are currently available:
 
 ## Citation
 
-If you find use this package useful, please consider citing
+To cite DeepIRTools in publications, use:
 
+Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
+
+To cite the method, use:
+
+Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
+
+BibTeX entries for LaTeX users are:
+```bibtex
+@Manual{,
+     title = {magick: Advanced Graphics and Image-Processing in R},
+     author = {Jeroen Ooms},
+     year = {2021},
+     note = {R package version 2.7.3},
+     url = {https://CRAN.R-project.org/package=magick},
+}
+```
+and:
 ```bibtex
 @article{UrbanBauer2021,
     author = {Urban, Christopher J. and Bauer, Daniel J.},
@@ -47,7 +64,7 @@ If you find use this package useful, please consider citing
 
 ## References
 
-Burda, Y., Grosse, R. & Salakhutdinov, R. (2016). Importance weighted autoencoders. In 4th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1509.00519](https://arxiv.org/abs/1509.00519)
+Burda, Y., Grosse, R., & Salakhutdinov, R. (2016). Importance weighted autoencoders. In 4th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1509.00519](https://arxiv.org/abs/1509.00519)
 
 Tucker, G., Lawson, D., Gu, S., & Maddison, C. J. (2019). Doubly reparameterized gradient estimators for Monte Carlo objectives. In 7th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1810.04152](https://arxiv.org/abs/1810.04152)
 
