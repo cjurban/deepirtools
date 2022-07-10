@@ -12,10 +12,10 @@ DeepIRTools' main functionality is the stand-alone ``ImportanceWeightedEstimator
 
 The following (multidimensional) latent factor models are currently available:
 
-    (1) Graded response model
-    (2) Generalized partial credit model
-    (3) Normal (linear) factor model
-    (4) Lognormal factor model
+    (a) Graded response model
+    (b) Generalized partial credit model
+    (c) Normal (linear) factor model
+    (d) Lognormal factor model
 
 ## Requirements
 
