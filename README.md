@@ -1,6 +1,6 @@
 # DeepIRTools
 
-DeepIRTools is a small Python package that uses scalable deep learning methods (e.g., [Urban and Bauer, 2021](https://link.springer.com/article/10.1007/s11336-021-09748-3)) to fit several kinds of exploratory and confirmatory latent factors models, with a particular focus on item response theory (IRT) models.
+DeepIRTools is a small Python package that uses scalable deep learning methods (e.g., [Urban and Bauer, 2021](https://link.springer.com/article/10.1007/s11336-021-09748-3)) to fit several kinds of exploratory and confirmatory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to reduce computing times.
 
 ## Description
 
