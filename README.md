@@ -27,7 +27,23 @@ The following (multidimensional) latent factor models are currently available:
 
 ### Tutorial
 
-[`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data. 
+[`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data.
+
+## Citation
+
+If you find use this package useful, please consider citing
+
+```bibtex
+@article{UrbanBauer2021,
+    author = {Urban, Christopher J. and Bauer, Daniel J.},
+    year={2021},
+    title={{A} deep learning algorithm for high-dimensional exploratory item factor analysis},
+    journal = {Psychometrika},
+    volume = {86},
+    number = {1},
+    pages = {1--29}
+}
+```
 
 ## References
 
