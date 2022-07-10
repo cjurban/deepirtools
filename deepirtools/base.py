@@ -46,10 +46,10 @@ class BaseEstimator():
             
         if isinstance(batch, list):
             batch, mask = batch[0], batch[1]
-            mask = mask.to(self.device).float()
+            mask = mask.to(self.device)
         else:
             mask = None
-        batch =  batch.to(self.device).float() 
+        batch =  batch.to(self.device)
         output = self.model(batch, mask=mask, **model_kwargs, **self.runtime_kwargs)
         loss = self.loss_function(*output)
 
@@ -124,7 +124,8 @@ class BaseEstimator():
 
         train_loader =  torch.utils.data.DataLoader(
                             tensor_dataset(data=data, mask=missing_mask),
-                            batch_size = batch_size, shuffle = True
+                            batch_size = batch_size, shuffle = True,
+                            pin_memory = self.device == "cuda",
                         )
         
         epoch = 0

@@ -106,7 +106,8 @@ class ImportanceWeightedEstimator(BaseEstimator):
         """Log-likelihood for a data set."""
         loader =  torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask),
-                    batch_size = 32, shuffle = True
+                    batch_size = 32, shuffle = True,
+                    pin_memory = self.device == "cuda",
                   )
         
         old_estimator = self.grad_estimator
@@ -134,17 +135,18 @@ class ImportanceWeightedEstimator(BaseEstimator):
         
         loader = torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask),
-                    batch_size = 32, shuffle = True
+                    batch_size = 32, shuffle = True,
+                    pin_memory = self.device == "cuda",
                   )
         
         scores = []
         for batch in loader:
             if isinstance(batch, list):
                 batch, mask = batch[0], batch[1]
-                mask = mask.to(self.device).float()
+                mask = mask.to(self.device)
             else:
                 mask = None
-            batch =  batch.to(self.device).float() 
+            batch =  batch.to(self.device)
             batch_size = batch.size(0)
             
             elbo, x = self.model(batch, mask = mask, mc_samples = mc_samples,
@@ -155,32 +157,32 @@ class ImportanceWeightedEstimator(BaseEstimator):
             idxs = torch.distributions.Categorical(probs = w_tilda.permute([1, 2, 3, 0])).sample()
             idxs = idxs.expand(x[-1, ...].shape).unsqueeze(0).long()
             scores.append(torch.gather(x, axis = 0, index = idxs).squeeze(0).mean(dim = 0))                  
-        return torch.cat(scores, dim = 0)
+        return torch.cat(scores, dim = 0).cpu()
         
     @property
     def loadings(self):
         try:
-            return self.model.decoder.loadings
+            return self.model.decoder.loadings.cpu()
         except AttributeError:
             return None
     
     @property
     def intercepts(self):
         try:
-            return self.model.decoder.intercepts
+            return self.model.decoder.intercepts.cpu()
         except AttributeError:
             return None
         
     @property
     def residual_std(self):
         try:
-            return self.model.decoder.residual_std.data
+            return self.model.decoder.residual_std.data.cpu()
         except AttributeError:
             return None
     
     @property
     def cov(self):
         try:
-            return self.model.cholesky.cov.data
+            return self.model.cholesky.cov.data.cpu()
         except AttributeError:
             return None

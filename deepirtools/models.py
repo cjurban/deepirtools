@@ -103,13 +103,13 @@ class CatBiasReshape(nn.Module):
         # Infinity saturates exponentials.
         bias_reshape, sliced_bias = self._reshape(bias, idxs, float("inf"))
         self.bias_reshape = nn.Parameter(bias_reshape)
-        self.mask = self.register_buffer(self._reshape(mask, idxs, 1., False))
+        self.register_buffer("mask", self._reshape(mask, idxs, 1., False))
         
         # Drop indices.
         nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
                                     value=float("nan")).unsqueeze(0) for
                                     _slice in sliced_bias], axis = 0)
-        self.drop_idxs = self.register_buffer(~nan_mask.view(-1).isnan())
+        self.register_buffer("drop_idxs", ~nan_mask.view(-1).isnan())
         
     def _reshape(self, t, idxs, pad_val, return_slices=True):
         sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
