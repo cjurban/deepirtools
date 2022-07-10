@@ -33,11 +33,11 @@ The following (multidimensional) latent factor models are currently available:
 
 To cite DeepIRTools in publications, use:
 
-&nbsp;&nbsp;&nbsp;Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
+  * Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
 
 To cite the method, use:
 
-&nbsp;&nbsp;&nbsp;Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
+  * Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
 
 BibTeX entries for LaTeX users are:
 ```bibtex
@@ -64,8 +64,8 @@ and:
 
 ## References
 
-*Burda, Y., Grosse, R., & Salakhutdinov, R. (2016). Importance weighted autoencoders. In 4th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1509.00519](https://arxiv.org/abs/1509.00519)
+  * Burda, Y., Grosse, R., & Salakhutdinov, R. (2016). Importance weighted autoencoders. In 4th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1509.00519](https://arxiv.org/abs/1509.00519)
 
-*Tucker, G., Lawson, D., Gu, S., & Maddison, C. J. (2019). Doubly reparameterized gradient estimators for Monte Carlo objectives. In 7th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1810.04152](https://arxiv.org/abs/1810.04152)
+  * Tucker, G., Lawson, D., Gu, S., & Maddison, C. J. (2019). Doubly reparameterized gradient estimators for Monte Carlo objectives. In 7th International Conference on Learning Representations. ICLR. [https://arxiv.org/abs/1810.04152](https://arxiv.org/abs/1810.04152)
 
-*Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
+  * Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
