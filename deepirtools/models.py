@@ -103,14 +103,13 @@ class CatBiasReshape(nn.Module):
         # Infinity saturates exponentials.
         bias_reshape, sliced_bias = self._reshape(bias, idxs, float("inf"))
         self.bias_reshape = nn.Parameter(bias_reshape)
-        if mask is not None:
-            self.mask = self._reshape(mask, idxs, 1., False)
+        self.mask = self.register_buffer(self._reshape(mask, idxs, 1., False))
         
         # Drop indices.
         nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
                                     value=float("nan")).unsqueeze(0) for
                                     _slice in sliced_bias], axis = 0)
-        self.drop_idxs = ~nan_mask.view(-1).isnan().to(mask.device)
+        self.drop_idxs = self.register_buffer(~nan_mask.view(-1).isnan())
         
     def _reshape(self, t, idxs, pad_val, return_slices=True):
         sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
@@ -398,7 +397,6 @@ class Spherical(nn.Module):
                  size:               int,
                  fixed_variances:    bool,
                  correlated_factors: List[int],
-                 device:             str,
                 ):
         """
         Spherical parameterization of a covariance matrix.
@@ -407,13 +405,11 @@ class Spherical(nn.Module):
             size               (int):         Number of correlated variables.
             fixed_variances    (bool):        Whether to fix variances to one.
             correlated_factors (List of int): Which variables should be correlated.
-            device             (str):         Computing device used for fitting.
         """
         super(Spherical, self).__init__()
         self.size = size
         self.fixed_variances = fixed_variances
         self.correlated_factors = correlated_factors
-        self.device = device
         
         if self.correlated_factors != []:
             n_elts = int((self.size * (self.size + 1)) / 2)
@@ -442,24 +438,24 @@ class Spherical(nn.Module):
     def weight(self):
         if self.correlated_factors != [] or not self.fixed_variances:
             tril_idxs = torch.tril_indices(row = self.size, col = self.size, offset = 0)
-            theta_mat = torch.zeros(self.size, self.size, device=self.device)
+            theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
             theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta
 
             # Ensure the parameterization is unique.
-            exp_theta_mat = torch.zeros(self.size, self.size, device=self.device)
+            exp_theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
             exp_theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta.exp()
             lower_tri_l_mat = (np.pi * exp_theta_mat) / (1 + theta_mat.exp())
             l_mat = exp_theta_mat.diag().diag_embed() + lower_tri_l_mat.tril(diagonal = -1)
 
             if self.fixed_variances:
-                l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.device)
+                l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.theta.device)
             
             # Constrain specific correlations to zero.
             l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = np.pi / 2
         
             return self._cart2spher(l_mat)
         else:
-            return torch.eye(self.size, device=self.device)
+            return torch.eye(self.size, device=self.theta.device)
 
     def forward(self,
                 x: torch.Tensor
@@ -470,18 +466,17 @@ class Spherical(nn.Module):
     def cov(self):
         if self.correlated_factors != [] or not self.fixed_variances:
             weight = self.weight
-
             return torch.matmul(weight, weight.t())
         else:
-            return torch.eye(self.size, device=self.device)
+            return torch.eye(self.size, device=self.theta.device)
     
     @property
     def inv_cov(self):
         if self.correlated_factors != [] or not self.fixed_variances:
-            return torch.cholesky_solve(torch.eye(self.size, device=self.device),
+            return torch.cholesky_solve(torch.eye(self.size, device=self.theta.device),
                                         self.weight)
         else:
-            return torch.eye(self.size, device=self.device)
+            return torch.eye(self.size, device=self.theta.device)
         
         
 def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=5.):
@@ -521,7 +516,6 @@ class VariationalAutoencoder(nn.Module):
                  input_size:            int,
                  inference_net_sizes:   List[int],
                  latent_size:           int,
-                 device:                str,
                  fixed_variances:       bool = True,
                  correlated_factors:    List[int] = [],
                  use_spline_prior:      bool = False,
@@ -537,7 +531,6 @@ class VariationalAutoencoder(nn.Module):
                                                    E.g., a neural network with two hidden layers of size 100
                                                    has inference_net_sizes = [100, 100]
             latent_size         (int):         Number of latent variables.
-            device              (str):         Computing device used for fitting.
             fixed_variances     (bool):        Whether to constrain latent variances to one.
             correlated_factors  (List of int): Which latent variables should be correlated.
             use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
@@ -561,7 +554,7 @@ class VariationalAutoencoder(nn.Module):
                 self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
                 self.flow3 = T.spline_coupling(latent_size)
         else:
-            self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors, device)
+            self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors)
         self.latent_size = latent_size
         self.fixed_variances = fixed_variances
         self.use_spline_prior = use_spline_prior

@@ -4,8 +4,8 @@ import math
 import timeit
 from typing import List, Optional
 from deepirtools.base import BaseEstimator
-from models import *
-from utils import tensor_dataset
+from deepirtools.models import *
+from deepirtools.utils import tensor_dataset
 
   
 class ImportanceWeightedEstimator(BaseEstimator):
@@ -54,7 +54,7 @@ class ImportanceWeightedEstimator(BaseEstimator):
             decoder = NormalFactorModel
         elif model_type == "lognormal":
             decoder = LogNormalFactorModel
-        self.model = VariationalAutoencoder(decoder=decoder, device=device, **model_kwargs)
+        self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
         self.optimizer = Adam([{"params" : self.model.parameters()}],
                                 lr = learning_rate, amsgrad = True)
         self.timerecords = {}
