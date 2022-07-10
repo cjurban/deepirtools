@@ -33,11 +33,11 @@ The following (multidimensional) latent factor models are currently available:
 
 To cite DeepIRTools in publications, use:
 
-|   Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
+&nbsp;&nbsp;&nbsp;Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
 
 To cite the method, use:
 
-|   Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
+&nbsp;&nbsp;&nbsp;Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. Psychometrika, 86(1), 1-29. [https://link.springer.com/article/10.1007/s11336-021-09748-3](https://link.springer.com/article/10.1007/s11336-021-09748-3)
 
 BibTeX entries for LaTeX users are:
 ```bibtex
