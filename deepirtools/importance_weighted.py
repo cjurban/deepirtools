@@ -143,10 +143,10 @@ class ImportanceWeightedEstimator(BaseEstimator):
         for batch in loader:
             if isinstance(batch, list):
                 batch, mask = batch[0], batch[1]
-                mask = mask.to(self.device)
+                mask = mask.to(self.device).float()
             else:
                 mask = None
-            batch =  batch.to(self.device)
+            batch =  batch.to(self.device).float()
             batch_size = batch.size(0)
             
             elbo, x = self.model(batch, mask = mask, mc_samples = mc_samples,

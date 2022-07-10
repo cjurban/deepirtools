@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepirtools"
-version = "1.0.17"
+version = "1.0.18"
 description = "Deep learning-based estimation and goodness-of-fit for item response theory models."
 dependencies = [
     'torch>=1.10.0',

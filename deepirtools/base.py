@@ -46,10 +46,10 @@ class BaseEstimator():
             
         if isinstance(batch, list):
             batch, mask = batch[0], batch[1]
-            mask = mask.to(self.device)
+            mask = mask.to(self.device).float()
         else:
             mask = None
-        batch =  batch.to(self.device)
+        batch =  batch.to(self.device).float()
         output = self.model(batch, mask=mask, **model_kwargs, **self.runtime_kwargs)
         loss = self.loss_function(*output)
 
