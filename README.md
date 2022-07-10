@@ -42,11 +42,11 @@ To cite the method, use:
 BibTeX entries for LaTeX users are:
 ```bibtex
 @Manual{DeepIRTools,
-     title = {magick: Advanced Graphics and Image-Processing in R},
-     author = {Jeroen Ooms},
+     title = {DeepIRTools},
+     author = {Urban, Christopher J.},
      year = {2022},
-     note = {R package version 2.7.3},
-     url = {https://CRAN.R-project.org/package=magick},
+     note = {Python package version 1.0.0},
+     url = {https://github.com/cjurban/deepirtools},
 }
 ```
 and:
