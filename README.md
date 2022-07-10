@@ -1,4 +1,5 @@
-# DeepIRTools
+<h1 align='center'>DeepIRTools</h1>
+<h2 align='center'>Deep Learning-Based Estimation and Inference for Latent Factor Models</h2>
 
 DeepIRTools is a small Python package that uses scalable deep learning methods (e.g., [Urban and Bauer, 2021](https://link.springer.com/article/10.1007/s11336-021-09748-3)) to fit several kinds of exploratory and confirmatory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to reduce computing times.
 
@@ -33,7 +34,7 @@ The following (multidimensional) latent factor models are currently available:
 
 To cite DeepIRTools in publications, use:
 
-  * Urban, C. J., & He, S. (2022). DeepIRTools. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
+* Urban, C. J., & He, S. (2022). DeepIRTools: : Deep learning-based estimation and inference for latent factor models. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
 
 To cite the method, use:
 
@@ -42,7 +43,7 @@ To cite the method, use:
 BibTeX entries for LaTeX users are:
 ```bibtex
 @Manual{DeepIRTools,
-     title = {DeepIRTools},
+    title = {DeepIRTools: Deep learning-based estimation and inference for latent factor models},
      author = {Urban, Christopher J. and He, Shara},
      year = {2022},
      note = {Python package version 1.0.0},
