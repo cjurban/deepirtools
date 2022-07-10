@@ -4,7 +4,7 @@ import numpy as np
 import os
 import timeit
 from typing import List, Optional
-from utils import ConvergenceChecker, tensor_dataset
+from deepirtools.utils import ConvergenceChecker, tensor_dataset
 
 
 class BaseEstimator():

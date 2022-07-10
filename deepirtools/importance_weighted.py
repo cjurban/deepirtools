@@ -3,7 +3,7 @@ from torch.optim import Adam
 import math
 import timeit
 from typing import List, Optional
-from base import BaseEstimator
+from deepirtools.base import BaseEstimator
 from models import *
 from utils import tensor_dataset
 

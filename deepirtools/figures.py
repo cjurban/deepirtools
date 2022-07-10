@@ -3,8 +3,8 @@ import numpy as np
 from typing import List, Optional
 import matplotlib.pyplot as plt
 from pylab import *
-from importance_weighted import ImportanceWeightedEstimator
-from utils import manual_seed, invert_factors
+from deepirtools.importance_weighted import ImportanceWeightedEstimator
+from deepirtools.utils import manual_seed, invert_factors
 
 
 def screeplot(latent_sizes:             List[int],
