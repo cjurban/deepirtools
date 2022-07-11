@@ -625,10 +625,10 @@ class VariationalAutoencoder(nn.Module):
         else:
             if self.cholesky.correlated_factors != []:
                 log_px = pydist.MultivariateNormal(torch.zeros_like(x, device = x.device),
-                                                 scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+                                                   scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
             else:
                 log_px = pydist.Normal(torch.zeros_like(x, device = x.device),
-                                     torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
+                                       torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
             
         # Log q(x | y).
         if iw_samples > 1 and grad_estimator == "dreg":
