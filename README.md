@@ -34,7 +34,7 @@ The following (multidimensional) latent factor models are currently available:
 
 To cite DeepIRTools in publications, use:
 
-* Urban, C. J., & He, S. (2022). DeepIRTools: : Deep learning-based estimation and inference for item response theory models. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
+* Urban, C. J., & He, S. (2022). DeepIRTools: Deep learning-based estimation and inference for item response theory models. Python package version 1.0.0. [https://github.com/cjurban/deepirtools](https://github.com/cjurban/deepirtools)
 
 To cite the method, use:
 
