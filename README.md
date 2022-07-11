@@ -1,13 +1,13 @@
 <h1 align='center'>DeepIRTools</h1>
 <h2 align='center'>Deep Learning-Based Estimation and Inference for Item Response Theory Models</h2>
 
-DeepIRTools is a small Python package that uses scalable deep learning methods (e.g., [Urban and Bauer, 2021](https://link.springer.com/article/10.1007/s11336-021-09748-3)) to fit several kinds of exploratory and confirmatory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to parallelize some computations.
+DeepIRTools is a small Python package that uses scalable deep learning methods (e.g., [Urban and Bauer, 2021](https://link.springer.com/article/10.1007/s11336-021-09748-3)) to fit several kinds of confirmatory and exploratory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to parallelize some computations.
 
 ## Description
 
 Latent factor models reduce the dimensionality of data by converting a large number of discrete or continuous observed variables (called *items*) into a smaller number of continuous unobserved variables (called *latent factors*), potentially making the data easier to understand. Latent factors models for discrete items are called *item response theory* (IRT) models.
 
-Traditional maximum likelihood (ML) estimation methods for IRT models are computationally intensive when the sample size, the number of items, and the number of latent factors are all large. This issue can be avoided by approximating the ML estimator using an *importance-weighted amortized variational estimator* (I-WAVE) from the field of deep learning ([Burda, Grosse, and Salakhutdinov, 2016](https://arxiv.org/abs/1509.00519); [Tucker, Lawson, Gu, and Maddison, 2019](https://arxiv.org/abs/1810.04152)). As an estimation byproduct, I-WAVE allows users to compute approximate factor scores and log-likelihoods for any observation &mdash; even observations that were not used for model fitting.
+Traditional maximum likelihood (ML) estimation methods for IRT models are computationally intensive when the sample size, the number of items, and the number of latent factors are all large. This issue can be avoided by approximating the ML estimator using an *importance-weighted amortized variational estimator* (I-WAVE) from the field of deep learning ([Burda, Grosse, and Salakhutdinov, 2016](https://arxiv.org/abs/1509.00519); [Tucker, Lawson, Gu, and Maddison, 2019](https://arxiv.org/abs/1810.04152)). As an estimation byproduct, I-WAVE allows researchers to compute approximate factor scores and log-likelihoods for any observation &mdash; even observations that were not used for model fitting.
 
 DeepIRTools' main functionality is the stand-alone ``IWAVE`` class contained in the  ``iwave`` module. This class includes ``fit()``, ``scores()``, and ``log_likelihood()`` methods for fitting a latent factor model and for computing approximate factor scores and log-likelihoods for the fitted model.
 
@@ -17,6 +17,8 @@ The following (multidimensional) latent factor models are currently available:
 2. Generalized partial credit model
 3. Normal (linear) factor model
 4. Lognormal factor model
+
+All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
 
 ## Requirements
 
