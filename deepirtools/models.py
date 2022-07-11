@@ -264,7 +264,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         return log_py_x.sum(dim = -1, keepdim = True)
     
     
-class ContinuousBaseModel(nn.Module):
+class NonGradedBaseModel(nn.Module):
     
     def __init__(self,
                  latent_size: int,
@@ -275,7 +275,7 @@ class ContinuousBaseModel(nn.Module):
                  ints_mask:   Optional[torch.Tensor] = None,
                 ):
         """
-        Base model for continuous responses.
+        Base model for non-graded responses.
         
         Args:
             latent_size (int):         Number of latent variables.
@@ -301,15 +301,12 @@ class ContinuousBaseModel(nn.Module):
         self._bias = nn.Parameter(torch.empty(n_items))
         self.ints_mask = ints_mask
         
-        self.free_phi = nn.Parameter(torch.empty(n_items))
+        self._reset_parameters()
         
-        self.reset_parameters()
-        
-    def reset_parameters(self):
+    def _reset_parameters(self):
         if self.Q is None and self.A is None:
             nn.init.xavier_uniform_(self.loadings.weight)
         nn.init.normal_(self._bias, mean=0., std=0.001)
-        nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
         
     def forward(self):
         """Compute log p(data | latents)."""
@@ -323,10 +320,6 @@ class ContinuousBaseModel(nn.Module):
             return self._bias
         
     @property
-    def residual_std(self):
-        return F.softplus(self.free_phi) + EPS
-        
-    @property
     def loadings(self):
         return self._loadings.weight.data
         
@@ -335,7 +328,7 @@ class ContinuousBaseModel(nn.Module):
         return self.bias.data
     
     
-class NormalFactorModel(ContinuousBaseModel):
+class PoissonFactorModel(NonGradedBaseModel):
     
     def __init__(self,
                  latent_size: int,
@@ -347,6 +340,37 @@ class NormalFactorModel(ContinuousBaseModel):
                 ):
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask)
+            
+    def forward(self,
+                x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+               ):
+        log_rate = self._loadings(x) + self.bias
+        
+        py_x = pydist.Poisson(rate = log_rate.exp().clamp(min = EPS, max = 100))
+        return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    
+class NormalFactorModel(NonGradedBaseModel):
+    
+    def __init__(self,
+                 latent_size: int,
+                 n_items:     int,
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask)
+        
+        self.free_phi = nn.Parameter(torch.empty(n_items))
+        
+        self.reset_parameters()
+        
+    def reset_parameters(self):
+        nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
             
     def forward(self,
                 x: torch.Tensor,
@@ -357,9 +381,13 @@ class NormalFactorModel(ContinuousBaseModel):
         
         py_x = pydist.Normal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @property
+    def residual_std(self):
+        return F.softplus(self.free_phi) + EPS
 
     
-class LogNormalFactorModel(ContinuousBaseModel):
+class LogNormalFactorModel(NonGradedBaseModel):
     
     def __init__(self,
                  latent_size: int,
@@ -371,6 +399,11 @@ class LogNormalFactorModel(ContinuousBaseModel):
                 ):
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask)
+        
+        self.free_phi = nn.Parameter(torch.empty(n_items))
+        
+    def reset_parameters(self):
+        nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
             
     def forward(self,
                 x: torch.Tensor,
@@ -381,6 +414,10 @@ class LogNormalFactorModel(ContinuousBaseModel):
         
         py_x = pydist.LogNormal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @property
+    def residual_std(self):
+        return F.softplus(self.free_phi) + EPS
             
     
 ################################################################################

@@ -15,10 +15,11 @@ The following (multidimensional) latent factor models are currently available:
 
 1. Graded response model
 2. Generalized partial credit model
-3. Normal (linear) factor model
-4. Lognormal factor model
+3. Poisson factor model
+4. Normal (linear) factor model
+5. Lognormal factor model
 
-All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
+All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings, intercepts, and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
 
 ## Requirements
 
