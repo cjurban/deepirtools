@@ -43,7 +43,7 @@ To cite the method, use:
 BibTeX entries for LaTeX users are:
 ```bibtex
 @Manual{DeepIRTools,
-    title = {DeepIRTools: Deep learning-based estimation and inference for item response theory models},
+     title = {DeepIRTools: Deep learning-based estimation and inference for item response theory models},
      author = {Urban, Christopher J. and He, Shara},
      year = {2022},
      note = {Python package version 1.0.0},
