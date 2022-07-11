@@ -8,7 +8,7 @@ from deepirtools.models import *
 from deepirtools.utils import tensor_dataset
 
   
-class ImportanceWeightedEstimator(BaseEstimator):
+class IWAVE(BaseEstimator):
     
     def __init__(self,
                  learning_rate:       float,

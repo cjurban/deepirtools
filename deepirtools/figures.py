@@ -3,7 +3,7 @@ import numpy as np
 from typing import List, Optional
 import matplotlib.pyplot as plt
 from pylab import *
-from deepirtools.importance_weighted import ImportanceWeightedEstimator
+from deepirtools.iwave import IWAVE
 from deepirtools.utils import manual_seed, invert_factors
 
 
@@ -64,16 +64,16 @@ def screeplot(latent_sizes:             List[int],
     ll_list = []
     for idx, latent_size in enumerate(latent_sizes):
         print("\nLatent size = ", latent_size, end="\n")
-        model = ImportanceWeightedEstimator(learning_rate = learning_rates[idx],
-                                            device = device,
-                                            model_type = model_type,
-                                            gradient_estimator = gradient_estimator,
-                                            log_interval = log_interval,
-                                            input_size = n_items,
-                                            inference_net_sizes = inference_net_sizes_list[idx],
-                                            latent_size = latent_size,
-                                            **model_kwargs,
-                                           )
+        model = IWAVE(learning_rate = learning_rates[idx],
+                      device = device,
+                      model_type = model_type,
+                      gradient_estimator = gradient_estimator,
+                      log_interval = log_interval,
+                      input_size = n_items,
+                      inference_net_sizes = inference_net_sizes_list[idx],
+                      latent_size = latent_size,
+                      **model_kwargs,
+                     )
         model.fit(data_train, batch_size, mask_train, max_epochs, iw_samples = iw_samples_fit)
 
         ll = model.log_likelihood(data_test, missing_mask=mask_test, iw_samples = iw_samples_ll)
