@@ -352,7 +352,7 @@ class PoissonFactorModel(NonGradedBaseModel):
         return -py_x.log_prob(y).sum(-1, keepdim = True)
     
     
-class NegativeBinomiallFactorModel(NonGradedBaseModel):
+class NegativeBinomialFactorModel(NonGradedBaseModel):
     
     def __init__(self,
                  latent_size: int,
@@ -366,6 +366,8 @@ class NegativeBinomiallFactorModel(NonGradedBaseModel):
                          ints_mask = ints_mask)
         
         self.logits = nn.Parameter(torch.empty(n_items))
+        
+        self.reset_parameters()
         
     def reset_parameters(self):
         nn.init.normal_(self.logits, mean=0., std=0.001)
@@ -431,6 +433,8 @@ class LogNormalFactorModel(NonGradedBaseModel):
                          ints_mask = ints_mask)
         
         self.free_phi = nn.Parameter(torch.empty(n_items))
+        
+        self.reset_parameters()
         
     def reset_parameters(self):
         nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)

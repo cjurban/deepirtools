@@ -44,7 +44,7 @@ class IWAVE(BaseEstimator):
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
         
-        model_types = ("grm", "gpcm", "poisson", "normal", "lognormal")
+        model_types = ("grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal")
         assert(model_type in model_types), "model_type must be one of {}".format(model_types)
         if model_type == "grm":
             decoder = GradedResponseModel
@@ -52,6 +52,8 @@ class IWAVE(BaseEstimator):
             decoder = GeneralizedPartialCreditModel
         elif model_type == "poisson":
             decoder = PoissonFactorModel
+        elif model_type == "negative_binomial":
+            decoder = NegativeBinomialFactorModel
         elif model_type == "normal":
             decoder = NormalFactorModel
         elif model_type == "lognormal":
