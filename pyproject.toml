@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepirtools"
-version = "1.0.20"
+version = "1.0.21"
 description = "Deep learning-based estimation and inference for item response theory models."
 dependencies = [
-    'torch>=1.10.0',
-    'pyro-ppl>=1.8.0',
-    'numpy>=1.19.3'
+    'torch',
+    'pyro-ppl',
+    'numpy'
 ]
 requires-python = ">=3.6"
 
 [project.urls]
-Homepage = "https://github.com/cjurban/DeepIRTools"
+Homepage = "https://github.com/cjurban/deepirtools"

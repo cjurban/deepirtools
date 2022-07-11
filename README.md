@@ -27,6 +27,14 @@ The following (multidimensional) latent factor models are currently available:
 
 ## Installation
 
+To install the latest stable version:
+
+``pip install deepirtools``
+
+To install the latest version on GitHub:
+
+``pip install git+https://github.com/cjurban/deepirtools``
+
 ## Examples
 
 ### Sample Code
