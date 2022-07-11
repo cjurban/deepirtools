@@ -9,7 +9,7 @@ Latent factor models reduce the dimensionality of data by converting a large num
 
 Traditional maximum likelihood (ML) estimation methods for IRT models are computationally intensive when the sample size, the number of items, and the number of latent factors are all large. This issue can be avoided by approximating the ML estimator using an *importance-weighted amortized variational estimator* (I-WAVE) from the field of deep learning ([Burda, Grosse, and Salakhutdinov, 2016](https://arxiv.org/abs/1509.00519); [Tucker, Lawson, Gu, and Maddison, 2019](https://arxiv.org/abs/1810.04152)). As an estimation byproduct, I-WAVE allows users to compute approximate factor scores and log-likelihoods for any observation &mdash; even observations that were not used for model fitting.
 
-DeepIRTools' main functionality is the stand-alone ``ImportanceWeightedEstimator`` class contained in the  ``importance_weighted`` module. This class includes ``fit()``, ``scores()``, and ``log_likelihood()`` methods for fitting a latent factor model and for computing approximate factor scores and log-likelihoods for the fitted model.
+DeepIRTools' main functionality is the stand-alone ``IWAVE`` class contained in the  ``iwave`` module. This class includes ``fit()``, ``scores()``, and ``log_likelihood()`` methods for fitting a latent factor model and for computing approximate factor scores and log-likelihoods for the fitted model.
 
 The following (multidimensional) latent factor models are currently available:
 
