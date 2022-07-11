@@ -21,7 +21,7 @@ The following (multidimensional) latent factor models are currently available:
 ## Requirements
 
 -  Python 3.6 or higher
--  ``pytorch``
+-  ``torch``
 -  ``pyro-ppl``
 -  ``numpy``
 
