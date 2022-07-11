@@ -11,14 +11,17 @@ Traditional maximum likelihood (ML) estimation methods for IRT models are comput
 
 DeepIRTools' main functionality is the stand-alone ``IWAVE`` class contained in the  ``iwave`` module. This class includes ``fit()``, ``scores()``, and ``log_likelihood()`` methods for fitting a latent factor model and for computing approximate factor scores and log-likelihoods for the fitted model.
 
-The following (multidimensional) latent factor models are currently available:
+The following (multidimensional) latent factor models are currently available...
 
-1. Graded response model
-2. Generalized partial credit model
-3. Poisson factor model
-5. Negative binomial factor model
-5. Normal (linear) factor model
-6. Lognormal factor model
+- for binary and ordinal items:
+  - Graded response model
+  - Generalized partial credit model
+- for count data:
+  - Poisson factor model
+  - Negative binomial factor model
+- for continuous items:
+  - Normal (linear) factor model
+  - Lognormal factor model
 
 All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings, intercepts, and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
 
