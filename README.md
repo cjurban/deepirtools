@@ -20,6 +20,11 @@ The following (multidimensional) latent factor models are currently available:
 
 ## Requirements
 
+-  Python 3.6 or higher
+-  ``pytorch``
+-  ``pyro-ppl``
+-  ``numpy``
+
 ## Installation
 
 ## Examples
@@ -29,6 +34,8 @@ The following (multidimensional) latent factor models are currently available:
 ### Tutorial
 
 [`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data.
+
+## Documentation
 
 ## Citation
 

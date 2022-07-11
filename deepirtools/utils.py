@@ -48,19 +48,6 @@ class ConvergenceChecker():
                   end = "")
         if self.converged:
             print("\n")
-            
-            
-def get_net(net_sizes: List[int],
-            out_size:  int,
-           ):
-    net_list = list(chain.from_iterable((nn.Linear(size1, size2), nn.ELU()) for size1, size2 in
-                    zip(net_sizes[0:-1], net_sizes[1:])))
-    if net_list != []:
-        net_list.append(nn.Linear(net_sizes[-1], out_size))
-        net = nn.Sequential(*net_list)
-    else:
-        net = nn.Linear(net_sizes[0], out_size)
-    return net
 
 
 def sigmoid(x):
