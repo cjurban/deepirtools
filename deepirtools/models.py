@@ -97,8 +97,7 @@ class CatBiasReshape(nn.Module):
         if mask is None:
             mask = torch.ones_like(bias)
         idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
-        bias.data = torch.from_numpy(np.hstack([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
-                                                idx, n_cat in zip(idxs[:-1], n_cats)]))
+        bias.data = torch.cat([get_thresholds([-4, 4], n_cat) for n_cat in n_cats], dim = 0)
         
         # Infinity saturates exponentials.
         bias_reshape, sliced_bias = self._reshape(bias, idxs, float("inf"))
@@ -412,13 +411,13 @@ class Spherical(nn.Module):
         self.correlated_factors = correlated_factors
         
         if self.correlated_factors != []:
-            n_elts = int((self.size * (self.size + 1)) / 2)
+            n_elts = int((size * (size + 1)) / 2)
             self.theta = nn.Parameter(torch.zeros([n_elts]))
-            diag_idxs = torch.from_numpy(np.cumsum(np.arange(1, self.size + 1)) - 1)
+            diag_idxs = torch.arange(1, size + 1).cumsum(dim = 0) - 1
             self.theta.data[diag_idxs] = np.log(np.pi / 2)
             
-            tril_idxs = torch.tril_indices(row = self.size - 1, col = self.size - 1, offset = 0)
-            uncorrelated_factors = [factor for factor in np.arange(self.size).tolist() if factor not in self.correlated_factors]
+            tril_idxs = torch.tril_indices(row = size - 1, col = size - 1, offset = 0)
+            uncorrelated_factors = [factor for factor in np.arange(size).tolist() if factor not in correlated_factors]
             self.uncorrelated_tril_idxs = tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
                                                            factor in uncorrelated_factors) > 0]
             

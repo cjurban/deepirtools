@@ -1,4 +1,5 @@
 import random
+import math
 import torch
 from torch import nn
 from torch.utils.data import Dataset
@@ -50,21 +51,11 @@ class ConvergenceChecker():
             print("\n")
 
 
-def sigmoid(x):
-    y = 1/(1+np.exp(-x))
-    return y
-
-
-def inv_sigmoid(y):
-    x = -np.log(y**-1 - 1)
-    return x
-
-
 def get_thresholds(rng, n_cat):
-    lower_prob = sigmoid(rng[0])
-    upper_prob = sigmoid(rng[1])
-    probs = np.linspace(lower_prob, upper_prob, n_cat + 1)[1:-1]
-    thresholds = inv_sigmoid(probs)
+    lower_prob = 1/(1+math.exp(-rng[0]))
+    upper_prob = 1/(1+math.exp(-rng[1]))
+    probs = torch.linspace(lower_prob, upper_prob, n_cat + 1)[1:-1]
+    thresholds = -probs.pow(-1).add(-1).log()
     return thresholds
 
         
