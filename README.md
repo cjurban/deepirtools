@@ -16,10 +16,10 @@ The following (multidimensional) latent factor models are currently available...
 - ...for binary and ordinal items:
   - Graded response model
   - Generalized partial credit model
-  - ...for continuous items:
+- ...for continuous items:
   - Normal (linear) factor model
   - Lognormal factor model
-  - ...for count data:
+- ...for count data:
   - Poisson factor model
   - Negative binomial factor model
 
