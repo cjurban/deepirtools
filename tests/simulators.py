@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import pyro.distributions as pydist
-from typing import List
 
 
 class BaseSimulator():
