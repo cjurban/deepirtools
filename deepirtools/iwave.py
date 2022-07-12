@@ -7,6 +7,14 @@ from deepirtools.base import BaseEstimator
 from deepirtools.models import *
 from deepirtools.utils import tensor_dataset
 
+
+MODEL_TYPES = {"grm" : GradedResponseModel,
+               "gpcm" : GeneralizedPartialCreditModel,
+               "poisson" : PoissonFactorModel,
+               "negative_binomial" : NegativeBinomialFactorModel,
+               "normal" : NormalFactorModel,
+               "lognormal" : LogNormalFactorModel}
+
   
 class IWAVE(BaseEstimator):
     
@@ -44,20 +52,9 @@ class IWAVE(BaseEstimator):
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
         
-        model_types = ("grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal")
-        assert(model_type in model_types), "model_type must be one of {}".format(model_types)
-        if model_type == "grm":
-            decoder = GradedResponseModel
-        elif model_type == "gpcm":
-            decoder = GeneralizedPartialCreditModel
-        elif model_type == "poisson":
-            decoder = PoissonFactorModel
-        elif model_type == "negative_binomial":
-            decoder = NegativeBinomialFactorModel
-        elif model_type == "normal":
-            decoder = NormalFactorModel
-        elif model_type == "lognormal":
-            decoder = LogNormalFactorModel
+        names = {k for k, _ in MODEL_TYPES.items()}
+        assert(model_type in names), "model_type must be one of {}".format(names)
+        decoder = MODEL_TYPES[model_type]
         self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
         self.optimizer = Adam([{"params" : self.model.parameters()}],
                                 lr = learning_rate, amsgrad = True)

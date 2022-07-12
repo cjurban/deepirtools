@@ -19,7 +19,8 @@ class GRMTest(nn.Module):
         self.intercepts = intercepts
         self.n_cats = n_cats
 
-    def forward(self,
+    @torch.no_grad()
+    def sample(self,
                 x: torch.Tensor,
                ):
         Bx = F.linear(x, self.loadings)
