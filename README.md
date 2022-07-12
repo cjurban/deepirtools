@@ -16,12 +16,12 @@ The following (multidimensional) latent factor models are currently available...
 - for binary and ordinal items:
   - Graded response model
   - Generalized partial credit model
-- for count data:
-  - Poisson factor model
-  - Negative binomial factor model
 - for continuous items:
   - Normal (linear) factor model
   - Lognormal factor model
+- for count data:
+  - Poisson factor model
+  - Negative binomial factor model
 
 All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings, intercepts, and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
 
