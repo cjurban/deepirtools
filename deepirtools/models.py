@@ -493,7 +493,7 @@ class Spherical(nn.Module):
             self.uncorrelated_tril_idxs = tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
                                                            factor in uncorrelated_factors) > 0]
             
-    def _cart2spher(self, cart_mat):
+    def cart2spher(self, cart_mat):
         n = cart_mat.size(1)
         spher_mat = torch.zeros_like(cart_mat)
         cos_mat = cart_mat[:, 1:n].cos()
@@ -524,7 +524,7 @@ class Spherical(nn.Module):
             # Constrain specific correlations to zero.
             l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = np.pi / 2
         
-            return self._cart2spher(l_mat)
+            return self.cart2spher(l_mat)
         else:
             return torch.eye(self.size, device=self.theta.device)
 

@@ -54,8 +54,8 @@ class IWAVE(BaseEstimator):
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
         
-        names = {k for k, _ in MODEL_TYPES.items()}
-        assert(model_type in names), "model_type must be one of {}".format(names)
+        keys = {k for k, _ in MODEL_TYPES.items()}
+        assert(model_type in keys), "model_type must be one of {}".format(keys)
         decoder = MODEL_TYPES[model_type]
         self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
         self.optimizer = Adam([{"params" : self.model.parameters()}],
