@@ -39,7 +39,7 @@ class IWAVE(BaseEstimator):
                                             "poisson"           = poisson factor model
                                             "negative_binomial" = negative binomial factor model
                                             "normal"            = normal factor model
-                                            "lognormal"         = log-normal factor model
+                                            "lognormal"         = lognormal factor model
             gradient_estimator (str):   Gradient estimator for inference model parameters:
                                             "dreg" = doubly reparameterized gradient estimator
                                             "iwae" = standard gradient estimator
