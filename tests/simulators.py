@@ -37,11 +37,11 @@ class PoissonFactorModelSimulator(BaseSimulator):
         latent_size = self.loadings.shape[1]
         x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
                                            covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size])
+        x = x_dist.sample([sample_size]).squeeze()
         rate = F.linear(x, self.loadings, self.intercepts).exp()
         
         y_dist = pydist.Poisson(rate = rate)
-        return y_dist.sample([sample_size])
+        return y_dist.sample()
     
     
 class NegativeBinomialModelSimulator(BaseSimulator):
@@ -62,11 +62,11 @@ class NegativeBinomialModelSimulator(BaseSimulator):
         latent_size = self.loadings.shape[1]
         x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
                                            covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size])
+        x = x_dist.sample([sample_size]).squeeze()
         total_count = F.linear(x, self.loadings, self.intercepts).exp()
         
         y_dist = pydist.NegativeBinomial(total_count = total_count, probs = self.probs)
-        return y_dist.sample([sample_size])
+        return y_dist.sample()
     
     
 class NormalFactorModelSimulator(BaseSimulator):
@@ -87,11 +87,11 @@ class NormalFactorModelSimulator(BaseSimulator):
         latent_size = self.loadings.shape[1]
         x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
                                            covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size])
+        x = x_dist.sample([sample_size]).squeeze()
         loc = F.linear(x, self.loadings, self.intercepts)
         
         y_dist = pydist.Normal(loc = loc, scale = self.residual_std)
-        return y_dist.sample([sample_size])
+        return y_dist.sample()
     
     
 class LogNormalFactorModelSimulator(BaseSimulator):
@@ -112,8 +112,8 @@ class LogNormalFactorModelSimulator(BaseSimulator):
         latent_size = self.loadings.shape[1]
         x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
                                            covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size])
+        x = x_dist.sample([sample_size]).squeeze()
         loc = F.linear(x, self.loadings, self.intercepts)
         
         y_dist = pydist.LogNormal(loc = loc, scale = self.residual_std)
-        return y_dist.sample([sample_size])
+        return y_dist.sample()
