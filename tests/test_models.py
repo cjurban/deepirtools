@@ -16,12 +16,19 @@ class GRMTest(nn.Module):
         super(GRMTest, self).__init__()
         
         self.loadings = loadings
-        self.intercepts = intercepts
-        self.n_cats = n_cats
+        idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
+        self.sliced_ints = [intercepts[i:j] for i, j in zip(idxs[:-1], idxs[1:])]
 
     @torch.no_grad()
     def sample(self,
                 x: torch.Tensor,
                ):
+        n_items = self.loadings.shape[1]
+        
         Bx = F.linear(x, self.loadings)
+        cum_probs = torch.cat([Bx + ints.unsqueeze(0) for ints in self.sliced_ints])
+        upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
+        lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
+        probs = upper_probs - lower_probs
+        
         

@@ -34,10 +34,12 @@ class IWAVE(BaseEstimator):
             learning_rate      (float): Step size for stochastic gradient optimizer.
             device             (str):   Computing device used for fitting.
             model_type         (str):   Measurement model type. Current options are:
-                                            "grm"       = graded response model
-                                            "gpcm"      = generalized partial credit model
-                                            "normal"    = normal factor model
-                                            "lognormal" = log-normal factor model
+                                            "grm"               = graded response model
+                                            "gpcm"              = generalized partial credit model
+                                            "poisson"           = poisson factor model
+                                            "negative_binomial" = negative binomial factor model
+                                            "normal"            = normal factor model
+                                            "lognormal"         = log-normal factor model
             gradient_estimator (str):   Gradient estimator for inference model parameters:
                                             "dreg" = doubly reparameterized gradient estimator
                                             "iwae" = standard gradient estimator
