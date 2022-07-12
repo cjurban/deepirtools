@@ -7,4 +7,4 @@ from .utils import (manual_seed,
                     normalize_loadings,
                     normalize_ints)
 from .figures import *
-__version__ = "1.1.4"
+__version__ = "1.1.5"
