@@ -123,110 +123,93 @@ class BaseParamSimulator():
     
     def __init__(self,):
         super(BaseParamSimulator, self).__init__()
-
-        self._param_dict = None
         
-    def __sample(self):
+    def sample(self):
         raise NotImplementedError
-        
-    @property
-    def param_dict(self):
-        if self._param_dict is None:
-            self.__sample()
-        return self._param_dict
     
     
 class LoadingsSimulator(BaseParamSimulator):
     
-    conds = ["cond1", "cond2", "cond3", "cond4"]
-    
     def __init__(self,
                  n_indicators:  int,
                  latent_size:   int,
-                 seed:          int,
                 ):
         super().__init__()
         
         self.n_indicators = n_indicators
         self.latent_size = latent_size
-        self.seed = seed
         
     @torch.no_grad()
-    def __sample(self):
+    def sample(self):
         n_items = int(n_indicators * latent_size)
         size = torch.Size([n_items, latent_size])
-        param_dict = {}
         
-        deepirtools.manual_seed(self.seed)
-        
-        for cond in self.conds:
-            if cond == "cond1":
+        ldgs_list = []
+        for i in range(4):
+            if i == 0:
                 mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
-            elif cond == "cond2":
+            elif i == 1:
                 mask = torch.block_diag(*[-torch.ones([n_indicators, 1])] * latent_size)
-            elif cond == "cond3":
+            elif i == 2:
                 mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
                 mask_mul = torch.bernoulli(torch.ones(size).mul(0.8))
                 mask = mask * torch.where(mask_mul == 0, -torch.ones(size), mask_mul)
-            elif cond == "cond4":
+            elif i == 3:
                 mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
                 mask[mask == 0] = 0.1
                 
             ldgs_dist = pydist.LogNormal(loc = torch.zeros(size),
                                          scale = torch.ones(size).mul(0.5))
-            param_dict[cond] = ldgs_dist.sample() * mask
+            ldgs_list[ldgs_dist.sample() * mask]
             
-        self._param_dict = param_dict
+        return ldgs_list
         
         
 class GradedInterceptsSimulator(BaseParamSimulator):
     
-    conds = ["cond1", "cond2", "cond3"]
-    
     def __init__(self,
                  n_items: int,
-                 seed:    int,
                 ):
         super().__init__()
         
         self.n_items = n_items
-        self.seed = seed
         
     @torch.no_grad()
-    def __sample(self):
-        param_dict = {}
-        
-        deepirtools.manual_seed(self.seed)
-        
-        for cond in self.conds:
-            if cond == "cond1":
-            elif cond == "cond2":
-            elif cond == "cond3":
+    def sample(self):
+        ints_list = []
+        for i in range(3):
+            if i == 0:
+                n_cats = [2] * self.n_items
+            elif i == 1:
+                n_cats = [3] * self.n_items
+            elif i == 2:
+                cats = [2, 3, 4, 5, 6]
+                assert(self.n_items >= len(cats))
+                n_cats = cats * (self.n_items // len(cats)) + cats[:self.n_items % len(cats)]
             
-        self._param_dict = param_dict 
-    
+            ints = []
+            for n_cat in n_cats:
+                if n_cat > 2:
+                    cuts = torch.linspace(-4, 4, n_cat)
+                    d = 4 / (n_cat - 1)
+                    ints.append(pydist.Uniform(-d, d).sample([n_cat - 1]) +
+                                0.5 * (cuts[1:] + cuts[:-1]))
+                else:
+                    ints.append(pydist.Uniform(-1.5, 1.5).sample([1]))
+            ints_list.append(torch.cat(ints, dim = 0))
+                
+        return ints_list
+        
     
 class NonGradedInterceptsSimulator(BaseParamSimulator):
     
-    conds = ["cond1"]
-    
     def __init__(self,
                  n_items: int,
-                 seed:    int,
                 ):
         super().__init__()
         
         self.n_items = n_items
-        self.seed = seed
         
     @torch.no_grad()
-    def __sample(self):
-        param_dict = {}
-        
-        deepirtools.manual_seed(self.seed)
-        
-        for cond in self.conds:
-            if cond == "cond1":
-                param_dict[cond] = torch.randn(self.n_items)
-            
-        self._param_dict = param_dict  
+    def sample(self):
+        return [torch.randn(self.n_items)]
