@@ -22,7 +22,7 @@ class BaseFactorModelSimulator():
         raise NotImplementedError
 
         
-class PoissonFactorModelSimulator(BaseFactorSimulator):
+class PoissonFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
                  loadings:   torch.Tensor,
@@ -44,7 +44,7 @@ class PoissonFactorModelSimulator(BaseFactorSimulator):
         return y_dist.sample()
     
     
-class NegativeBinomialFactorModelSimulator(BaseFactorSimulator):
+class NegativeBinomialFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
                  loadings:   torch.Tensor,
@@ -69,7 +69,7 @@ class NegativeBinomialFactorModelSimulator(BaseFactorSimulator):
         return y_dist.sample()
     
     
-class NormalFactorModelSimulator(BaseFactorSimulator):
+class NormalFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
                  loadings:     torch.Tensor,
@@ -94,7 +94,7 @@ class NormalFactorModelSimulator(BaseFactorSimulator):
         return y_dist.sample()
     
     
-class LogNormalFactorModelSimulator(BaseFactorSimulator):
+class LogNormalFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
                  loadings:     torch.Tensor,
