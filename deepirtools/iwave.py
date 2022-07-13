@@ -8,6 +8,9 @@ from deepirtools.models import *
 from deepirtools.utils import tensor_dataset
 
 
+GRAD_ESTIMATORS = ("iwae", "dreg")
+
+
 MODEL_TYPES = {"grm" : GradedResponseModel,
                "gpcm" : GeneralizedPartialCreditModel,
                "poisson" : PoissonFactorModel,
@@ -48,8 +51,7 @@ class IWAVE(BaseEstimator):
             model_kwargs       (dict):  Named parameters passed to VariationalAutoencoder.__init__().
         """
         super().__init__(device, log_interval, verbose)
-        grad_estimators = ("iwae", "dreg")
-        assert(gradient_estimator in grad_estimators), "gradient_estimator must be one of {}".format(grad_estimators)
+        assert(gradient_estimator in GRAD_ESTIMATORS), "gradient_estimator must be one of {}".format(GRAD_ESTIMATORS)
         self.grad_estimator = gradient_estimator
         
         self.runtime_kwargs["grad_estimator"] = self.grad_estimator
