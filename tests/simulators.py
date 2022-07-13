@@ -5,7 +5,7 @@ import pyro.distributions as pydist
 import deepirtools
 
 
-class BaseFactorSimulator():
+class BaseFactorModelSimulator():
     
     def __init__(self,
                  loadings:   torch.Tensor,
@@ -44,7 +44,7 @@ class PoissonFactorModelSimulator(BaseFactorSimulator):
         return y_dist.sample()
     
     
-class NegativeBinomialModelSimulator(BaseFactorSimulator):
+class NegativeBinomialFactorModelSimulator(BaseFactorSimulator):
     
     def __init__(self,
                  loadings:   torch.Tensor,
