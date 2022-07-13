@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
 import pyro.distributions as pydist
 
@@ -214,3 +213,29 @@ class NonGradedInterceptsSimulator(BaseParamSimulator):
     @torch.no_grad()
     def sample(self):
         return [torch.randn(self.n_items)]
+    
+    
+class CovarianceMatrixSimulator(BaseParamSimulator):
+    
+    def __init__(self,
+                 latent_size: int,
+                ):
+        super().__init__()
+        
+        self.latent_size = latent_size
+        
+    @torch.no_grad()
+    def sample(self):
+        cov_mat_list = []
+        for i in range(3):
+            if i == 0:
+                cov_mat = torch.eye(self.latent_size)
+            if i == 1:
+                cov_mat = torch.ones([self.latent_size, self.latent_size]).mul(0.3)
+                cov_mat.fill_diagonal_(1)
+            if i == 2:
+                L = torch.randn([latent_size, latent_size]).tril()
+                cov_mat = torch.mm(L, L.T)
+            cov_mat_list.append(cov_mat)
+            
+        return cov_mat_list
