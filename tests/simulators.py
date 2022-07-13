@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import pyro.distributions as pydist
-import deepirtools
 
 
 class BaseFactorModelSimulator():
@@ -177,6 +176,7 @@ class GradedInterceptsSimulator(BaseParamSimulator):
     @torch.no_grad()
     def sample(self):
         ints_list = []
+        n_cats_list = []
         for i in range(3):
             if i == 0:
                 n_cats = [2] * self.n_items
@@ -186,6 +186,7 @@ class GradedInterceptsSimulator(BaseParamSimulator):
                 cats = [2, 3, 4, 5, 6]
                 assert(self.n_items >= len(cats))
                 n_cats = cats * (self.n_items // len(cats)) + cats[:self.n_items % len(cats)]
+            n_cats_list.append(n_cats)
             
             ints = []
             for n_cat in n_cats:
@@ -198,7 +199,7 @@ class GradedInterceptsSimulator(BaseParamSimulator):
                     ints.append(pydist.Uniform(-1.5, 1.5).sample([1]))
             ints_list.append(torch.cat(ints, dim = 0))
                 
-        return ints_list
+        return ints_list, n_cats_list
         
     
 class NonGradedInterceptsSimulator(BaseParamSimulator):
