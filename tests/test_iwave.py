@@ -40,19 +40,19 @@ def test_latent_sizes(latent_size, model_type, device):
         ints, n_cats = generate_graded_intercepts(n_items).to(device)
         iwave_kwargs = {"n_cats" : n_cats}
     else:
-        iwave_kwargs, sim_kwargs = {"n_items" : n_items}, {}
+        iwave_kwargs = {"n_items" : n_items}=
         
         if model_type != "normal":
             ldgs = generate_loadings(n_indicators, latent_size, shrink = True).to(device)
             ints = generate_non_graded_intercepts(n_items, all_positive = True).to(device)
             if model_type == "negative_binomial":
-                sim_kwargs["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items]).to(device)
+                sim_kwargs = {"probs" : pydist.Uniform(0.5, 0.7).sample([n_items]).to(device)}
             elif model_type == "lognormal":
-                sim_kwargs["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items]).to(device)
+                sim_kwargs = {"residual_std" : pydist.Uniform(1, 1.2).sample([n_items]).to(device)}
         else:
             ldgs = generate_loadings(n_indicators, latent_size).to(device)
             ints = generate_non_graded_intercepts(n_items).to(device)
-            sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)
+            sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)}
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         
