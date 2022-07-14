@@ -9,8 +9,6 @@ from deepirtools.utils import tensor_dataset
 
 
 GRAD_ESTIMATORS = ("iwae", "dreg")
-
-
 MODEL_TYPES = {"grm" : GradedResponseModel,
                "gpcm" : GeneralizedPartialCreditModel,
                "poisson" : PoissonFactorModel,
