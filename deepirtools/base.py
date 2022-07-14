@@ -3,8 +3,13 @@ from torch.utils.data import Dataset
 import numpy as np
 import os
 import timeit
+import warnings
 from typing import List, Optional
 from deepirtools.utils import ConvergenceChecker, tensor_dataset
+
+
+class OptimizationWarning(UserWarning):
+    pass
 
 
 class BaseEstimator():
@@ -74,9 +79,9 @@ class BaseEstimator():
                 loss = self.step(batch, **model_kwargs)
                 
                 if torch.isnan(loss):
-                    print(("\nNaN loss obtained, ending fitting. "
-                           "Consider increasing batch size or reducing learning rate."),
-                          end = "\n")
+                    warnings.warn(("NaN loss obtained, ending fitting. "
+                                   "Consider increasing batch size or reducing learning rate."),
+                                  OptimizationWarning)
                     self.checker.converged = True
                     break
                     
@@ -134,7 +139,7 @@ class BaseEstimator():
 
             epoch += 1
             if epoch == max_epochs and not self.checker.converged:
-                print("\nFailed to converge within " + str(max_epochs) + " epochs.")
+                warnings.warn(("Failed to converge within " + str(max_epochs) + " epochs."), OptimizationWarning)
                 break
                 
         stop = timeit.default_timer()

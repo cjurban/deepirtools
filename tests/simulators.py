@@ -237,3 +237,31 @@ class CovarianceMatrixSimulator(BaseParamSimulator):
             cov_mat_list.append(cov_mat)
             
         return cov_mat_list
+    
+    
+class ResidualStdDevSimulator(BaseParamSimulator):
+    
+    def __init__(self,
+                 n_items: int,
+                ):
+        super().__init__()
+        
+        self.n_items = n_items
+        
+    @torch.no_grad()
+    def sample(self):
+        return pydist.Uniform(0.1, 0.3).sample([self.n_items])
+    
+    
+class TotalCountSimulator(BaseParamSimulator):
+    
+    def __init__(self,
+                 n_items: int,
+                ):
+        super().__init__()
+        
+        self.n_items = n_items
+        
+    @torch.no_grad()
+    def sample(self):
+        return pydist.Uniform(0.5, 0.7).sample([self.n_items])
