@@ -18,12 +18,11 @@ SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
 
 
 deepirtools.manual_seed(1234)
-torch.set_default_dtype(torch.float64)
 devices = ["cpu"]
 if torch.cuda.is_available():
     devices.append("cuda")
 
-sample_size = 1000
+sample_size = 10000
 
 
 @pytest.mark.parametrize("model_type", ["grm", "gpcm", "poisson", "negative_binomial",
@@ -40,27 +39,35 @@ def test_latent_size_1(model_type, device):
         ints = pydist.Uniform(-1.5, 1.5).sample([n_items]).to(device)
         iwave_kwargs = {"n_cats" : n_cats}
     else:
-        ints = torch.randn(n_items, device=device)
         sim_kwargs = {}
-        if model_type == "negative_binomial":
-            sim_kwargs["total_count"] = pydist.Uniform(0.5, 0.7).sample([self.n_items]).to(device)
-        elif model_type in ("normal", "lognormal"):
-            sim_kwargs["residual_std"] = pydist.Uniform(0.1, 0.3).sample([self.n_items]).to(device)
+        
+        if model_type != "normal":
+            ldgs.mul_(0.3).clamp_(max = 0.7)
+            ints = pydist.Uniform(0.1, 0.5).sample([n_items]).to(device)
+            if model_type == "negative_binomial":
+                sim_kwargs["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items]).to(device)
+            elif model_type == "lognormal":
+                sim_kwargs["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items]).to(device)
+        else:
+            ints = torch.randn(n_items, device=device).mul(0.1)
+            sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         iwave_kwargs = {"n_items" : n_items}
         
-        iwave = IWAVE(
-                      learning_rate = 1e-3,
-                      device = device,
-                      model_type = model_type,
-                      input_size = n_items,
-                      inference_net_sizes = [100],
-                      latent_size = latent_size,
-                      **iwave_kwargs,
-                     )
-        iwave.fit(Y, batch_size = 128, iw_samples = 5)
+    iwave = IWAVE(
+                  learning_rate = 1e-3,
+                  device = device,
+                  model_type = model_type,
+                  input_size = n_items,
+                  inference_net_sizes = [100],
+                  latent_size = latent_size,
+                  **iwave_kwargs,
+                 )
+    iwave.fit(Y, batch_size = 128, iw_samples = 5)
+    return iwave
     
-    
+model_type = "lognormal"; device = "cpu"
+out = test_latent_size_1(model_type, device)
 
     

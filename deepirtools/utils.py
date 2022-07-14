@@ -59,32 +59,35 @@ def get_thresholds(rng, n_cat):
     return thresholds
 
         
-def invert_factors(mat: np.ndarray):
+def invert_factors(mat: torch.Tensor):
     """
     For each factor, flip sign if sum of loadings is negative.
     
     Args:
-        mat (ndarray): Loadings matrix.
+        mat (Tensor): Loadings matrix.
     """
-    mat = mat.copy()
-    for col_idx in range(0, mat.shape[1]): 
-        if np.sum(mat[:, col_idx]) < 0: 
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
+    mat = mat.clone()
+    for col_idx in range(mat.shape[1]): 
+        if mat[:, col_idx].sum() < 0: 
             mat[:, col_idx] = -mat[:, col_idx]
     return mat
 
 
-def invert_cov(cov: np.ndarray,
-               mat: np.ndarray):
+def invert_cov(cov: torch.Tensor,
+               mat: torch.Tensor):
     """
     Flip covariances according to loadings signs.
     
     Args:
-        cov (ndarray): Covariance matrix.
-        mat (ndarray): Loadings matrix.
+        cov (Tensor): Covariance matrix.
+        mat (Tensor): Loadings matrix.
     """
-    cov = cov.copy()
-    for col_idx in range(0, mat.shape[1]):
-        if np.sum(mat[:, col_idx]) < 0:
+    assert(len(cov.shape) == 2), "Factor covariance matrix must be 2D."
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
+    cov = cov.clone()
+    for col_idx in range(mat.shape[1]):
+        if mat[:, col_idx].sum() < 0:
             # Invert column and row.
             inv_col_idxs = np.delete(np.arange(cov.shape[1]), col_idx, 0)
             cov[:, inv_col_idxs] = -cov[:, inv_col_idxs]
@@ -92,35 +95,39 @@ def invert_cov(cov: np.ndarray,
     return cov
 
 
-def normalize_loadings(mat: np.ndarray):
+def normalize_loadings(mat: torch.Tensor):
     """
     Convert loadings to normal ogive metric.
     
     Args:
-        mat (ndarray): Loadings matrix.
+        mat (Tensor): Loadings matrix.
     """
-    mat = mat.copy() / 1.702
-    scale_const = np.sqrt(1 + np.sum(mat**2, axis = 1))
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
+    mat = mat.clone().div(1.702)
+    scale_const = mat.pow(2).sum(dim = 1).add(1).sqrt()
     return (mat.T / scale_const).T
 
 
-def normalize_ints(ints:   np.ndarray,
-                   mat:    np.ndarray,
+def normalize_ints(ints:   torch.Tensor,
+                   mat:    torch.Tensor,
                    n_cats: List[int]):
     """
     Convert intercepts to normal ogive metric.
     
     Args:
-        ints   (ndarray):     Intercepts vector.
-        mat    (ndarray):     Loadings matrix.
+        ints   (Tensor):      Intercepts vector.
+        mat    (Tensor):      Loadings matrix.
         n_cats (List of int): Number of categories for each item.
     """
+    assert(len(ints.shape) == 1), "Intercepts vector must be 1D."
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     n_cats = [1] + n_cats
     idxs = np.cumsum([n_cat - 1 for n_cat in n_cats])
     sliced_ints = [ints[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
-    mat = mat.copy() / 1.702
-    scale_const = np.sqrt(1 + np.sum(mat**2, axis = 1))
-    return np.hstack([sliced_int / scale_const[i] for i, sliced_int in enumerate(sliced_ints)])
+    mat = mat.clone().div(1.702)
+    scale_const = mat.pow(2).sum(dim = 1).add(1).sqrt()
+    return torch.cat([sliced_int / scale_const[i] for i, sliced_int in enumerate(sliced_ints)],
+                     dim = 0)
     
     
 class tensor_dataset(Dataset):

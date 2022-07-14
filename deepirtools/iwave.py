@@ -1,5 +1,6 @@
 import torch
 from torch.optim import Adam
+from torch.distributions.utils import logits_to_probs
 import math
 import timeit
 from typing import List, Optional
@@ -181,6 +182,13 @@ class IWAVE(BaseEstimator):
     def residual_std(self):
         try:
             return self.model.decoder.residual_std.data.cpu()
+        except AttributeError:
+            return None
+    
+    @property
+    def probs(self):
+        try:
+            logits_to_probs(self.model.decoder.logits.data.cpu(), is_binary = True)
         except AttributeError:
             return None
     
