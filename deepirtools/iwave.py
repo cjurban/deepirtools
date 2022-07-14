@@ -14,7 +14,8 @@ MODEL_TYPES = {"grm" : GradedResponseModel,
                "poisson" : PoissonFactorModel,
                "negative_binomial" : NegativeBinomialFactorModel,
                "normal" : NormalFactorModel,
-               "lognormal" : LogNormalFactorModel}
+               "lognormal" : LogNormalFactorModel,
+              }
 
   
 class IWAVE(BaseEstimator):

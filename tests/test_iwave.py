@@ -4,11 +4,17 @@ import pytest
 import subprocess
 import torch
 import deepirtools
-from . import simulators as sim
+from deepirtools import IWAVE
+from simulators import *
 
 
 DATA_DIR = os.path.join("tests", "data")
 EXPECTED_DIR = os.path.join("tests", "expected")
+SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
+              "negative_binomial" : NegativeBinomialFactorModelSimulator,
+              "normal" : NormalFactorModelSimulator,
+              "lognormal" : LogNormalFactorModelSimulator,
+             }
 
 
 deepirtools.manual_seed(1234)
@@ -18,26 +24,43 @@ if torch.cuda.is_available():
     devices.append("cuda")
 
 sample_size = 1000
-batch_size = 32
-n_indicators = 4
-latent_size = 4
-n_items = int(n_indicators * latent_size)
-
-ldgs_sim = sim.LoadingsSimulator(n_indicators, latent_size)
-grd_ints_sim = sim.GradedInterceptsSimulator(n_items)
-ngrd_ints_sim = sim.NonGradedInterceptsSimulator(n_items)
-cov_mat_sim = sim.CovarianceMatrixSimulator(latent_size)
 
 
 @pytest.mark.parametrize("model_type", ["grm", "gpcm", "poisson", "negative_binomial",
                                         "normal", "lognormal"])
 @pytest.mark.parametrize("device", devices)
-def test_latent_factor_model(model_type, device):
-    ldgs_list = ldgs_sim.sample()
-    cov_mat = cov_mat_sim.sample()
+def test_latent_size_1(model_type, device):
+    latent_size = 1
+    n_items = 10
+    ldgs = pydist.LogNormal(loc = torch.zeros([n_items, latent_size], device=device),
+                            scale = torch.ones([n_items, latent_size], device=device).mul(0.5)).sample()
+    cov_mat = torch.eye(latent_size, device=device)
     if model_type in ("grm", "gpcm"):
-        ints_list = grd_ints_sim.sample()
+        n_cats = [2] * n_items
+        ints = pydist.Uniform(-1.5, 1.5).sample([n_items]).to(device)
+        iwave_kwargs = {"n_cats" : n_cats}
     else:
-        ints_list = ngrd_ints_sim.sample()
+        ints = torch.randn(n_items, device=device)
+        sim_kwargs = {}
+        if model_type == "negative_binomial":
+            sim_kwargs["total_count"] = pydist.Uniform(0.5, 0.7).sample([self.n_items]).to(device)
+        elif model_type in ("normal", "lognormal"):
+            sim_kwargs["residual_std"] = pydist.Uniform(0.1, 0.3).sample([self.n_items]).to(device)
+        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
+                                   cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
+        iwave_kwargs = {"n_items" : n_items}
+        
+        iwave = IWAVE(
+                      learning_rate = 1e-3,
+                      device = device,
+                      model_type = model_type,
+                      input_size = n_items,
+                      inference_net_sizes = [100],
+                      latent_size = latent_size,
+                      **iwave_kwargs,
+                     )
+        iwave.fit(Y, batch_size = 128, iw_samples = 5)
     
+    
+
     

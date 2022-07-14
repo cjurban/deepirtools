@@ -307,7 +307,7 @@ class NonGradedBaseModel(nn.Module):
         
     def _reset_parameters(self):
         if self.Q is None and self.A is None:
-            nn.init.xavier_uniform_(self.loadings.weight)
+            nn.init.xavier_uniform_(self._loadings.weight)
         nn.init.normal_(self._bias, mean=0., std=0.001)
         
     def forward(self):
