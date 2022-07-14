@@ -599,7 +599,7 @@ class VariationalAutoencoder(nn.Module):
         Args:
             decoder             (nn.Module):   Measurement model whose forward() method returns log p(data | latents).
             input_size          (int):         Neural network input dimension.
-            inference_net_sizes (List of int): Neural network input and hidden layer dimensions.
+            inference_net_sizes (List of int): Neural network hidden layer dimensions.
                                                    E.g., a neural network with two hidden layers of size 100
                                                    has inference_net_sizes = [100, 100]
             latent_size         (int):         Number of latent variables.
