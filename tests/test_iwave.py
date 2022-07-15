@@ -68,5 +68,5 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
     assert(invert_factors(est_ldgs).add(-exp_ldgs).abs().le(abs_tol).all())
     assert(est_ints.add(-exp_ints).abs().le(abs_tol).all())
     if est_cov_mat is not None:
-        assert(invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat.abs().le(abs_tol).all())
+        assert(invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat.abs().le(abs_tol).all()))
     
