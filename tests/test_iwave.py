@@ -56,13 +56,13 @@ def test_latent_sizes(latent_size, model_type, device):
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         
-    imodel = IWAVE(learning_rate = 1e-3,
-                   device = device,
-                   model_type = model_type,
-                   input_size = n_items,
-                   inference_net_sizes = [100],
-                   latent_size = latent_size,
-                   **iwave_kwargs,
+    model = IWAVE(learning_rate = 1e-3,
+                  device = device,
+                  model_type = model_type,
+                  input_size = n_items,
+                  inference_net_sizes = [100],
+                  latent_size = latent_size,
+                  **iwave_kwargs,
                   )
     model.fit(Y, batch_size = 128, iw_samples = 5)
     
