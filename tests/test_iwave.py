@@ -1,8 +1,6 @@
 import os
 from os.path import join
 import pytest
-import subprocess
-import pandas as pd
 import torch
 from deepirtools import IWAVE
 from deepirtools.utils import *
@@ -12,11 +10,9 @@ from sim_utils import *
 abs_tol = 0.1
 expected_dir = "expected"
 data_dir = "data"
-simulators = {"poisson" : PoissonFactorModelSimulator,
-              "negative_binomial" : NegativeBinomialFactorModelSimulator,
-              "normal" : NormalFactorModelSimulator,
-              "lognormal" : LogNormalFactorModelSimulator,
-             }
+
+os.makedirs(expected_dir, exist_ok = True)
+os.makedirs(data_dir, exist_ok = True)
 
 deepirtools.manual_seed(1234)
 devices = ["cpu"]

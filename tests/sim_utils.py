@@ -1,6 +1,10 @@
+import os
+from os.path import join
 import torch
 import torch.nn.functional as F
 import pyro.distributions as pydist
+import numpy as np
+import subprocess
 
 
 class BaseFactorModelSimulator():
@@ -117,10 +121,18 @@ class LogNormalFactorModelSimulator(BaseFactorModelSimulator):
         return y_dist.sample()
     
     
+SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
+              "negative_binomial" : NegativeBinomialFactorModelSimulator,
+              "normal" : NormalFactorModelSimulator,
+              "lognormal" : LogNormalFactorModelSimulator,
+             }
+    
+    
 def simulate_loadings(n_indicators: int,
                       latent_size:  int,
                       shrink:       bool = False,
                      ):
+    n_items = int(n_indicators * latent_size)
     mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
     ldgs_dist = pydist.LogNormal(loc = torch.zeros([n_items, latent_size]),
                                  scale = torch.ones([n_items, latent_size]).mul(0.5))
@@ -163,10 +175,19 @@ def simulate_non_graded_intercepts(n_items: int,
     return torch.randn(n_items).mul(0.1)
 
 
-def simulate_and_save_data():
+def simulate_and_save_data(n_indicators: int,
+                           latent_size:  int,
+                           expected_dir: str,
+                           data_dir:     str,
+                          ):
+    n_items = int(n_indicators * latent_size)
     if model_type in ("grm", "gpcm"):
         ldgs = simulate_loadings(n_indicators, latent_size).to(device)
-        ints, n_cats = simulate_graded_intercepts(n_items).to(device)
+        ints, n_cats = simulate_graded_intercepts(n_items); ints = ints.to(device)
+        
+        np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
+        np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
+        np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
     else:
         if model_type != "normal":
             ldgs = simulate_loadings(n_indicators, latent_size, shrink = True).to(device)
@@ -179,8 +200,15 @@ def simulate_and_save_data():
             ldgs = simulate_loadings(n_indicators, latent_size).to(device)
             ints = simulate_non_graded_intercepts(n_items).to(device)
             sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)}
-        Y = simulators[model_type](loadings = ldgs, intercepts = ints,
+        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
+        
+        np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
+        np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
+        np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
+        for k, v in sim_kwargs.items():
+            np.savetxt(os.path.join(expected_dir, k + ".csv"), v.numpy(), delimiter = ",")
+        np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
 #
 #    
 #class CovarianceMatrixSimulator(BaseParamSimulator):
