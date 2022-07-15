@@ -2,22 +2,21 @@ import os
 from os.path import join
 import pytest
 import subprocess
+import pandas as pd
 import torch
 from deepirtools import IWAVE
 from deepirtools.utils import *
-from simulators import *
-from utils import *
+from sim_utils import *
 
 
-ABS_TOL = 0.1
-DATA_DIR = os.path.join("tests", "data")
-EXPECTED_DIR = os.path.join("tests", "expected")
-SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
+abs_tol = 0.1
+expected_dir = "expected"
+data_dir = "data"
+simulators = {"poisson" : PoissonFactorModelSimulator,
               "negative_binomial" : NegativeBinomialFactorModelSimulator,
               "normal" : NormalFactorModelSimulator,
               "lognormal" : LogNormalFactorModelSimulator,
              }
-
 
 deepirtools.manual_seed(1234)
 devices = ["cpu"]
@@ -53,8 +52,10 @@ def test_latent_sizes(latent_size, model_type, device):
             ldgs = generate_loadings(n_indicators, latent_size).to(device)
             ints = generate_non_graded_intercepts(n_items).to(device)
             sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)}
-        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
+        Y = simulators[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
+        
+        
         
     model = IWAVE(learning_rate = 1e-3,
                   device = device,
@@ -66,6 +67,6 @@ def test_latent_sizes(latent_size, model_type, device):
                   )
     model.fit(Y, batch_size = 128, iw_samples = 5)
     
-    assert(invert_factors(model.loadings).add(-ldgs).abs().le(ABS_TOL).all())
-    assert(model.intercepts.add(-ints).abs().le(ABS_TOL).all())
+    assert(invert_factors(model.loadings).add(-ldgs).abs().le(abs_tol).all())
+    assert(model.intercepts.add(-ints).abs().le(abs_tol).all())
     
