@@ -25,3 +25,4 @@ Y = simdata(a = ldgs,
             itemtype = if(model_type == "grm") {"graded"} else {model_type},
             sigma = cov_mat
            )
+write_csv(Y, file.path(data_dir, "data.csv"), col_names = FALSE)

@@ -185,7 +185,7 @@ def simulate_covariance_matrix(latent_size: int,
         cov_mat = torch.ones([latent_size, latent_size]).mul(0.3)
         cov_mat.fill_diagonal_(1)
     if cov_type == 2:
-        L = torch.randn([latent_size, latent_size]).tril()
+        L = pydist.Uniform(-0.7, 0.7).sample([latent_size, latent_size]).tril()
         cov_mat = torch.mm(L, L.T)
         
     return cov_mat
@@ -202,24 +202,28 @@ def simulate_and_save_data(model_type:   str,
     cov_mat = simulate_covariance_matrix(latent_size, cov_type)
     
     if model_type in ("grm", "gpcm"):
-        ldgs = simulate_loadings(n_indicators, latent_size).to(device)
-        ints, n_cats = simulate_graded_intercepts(n_items); ints = ints.to(device)
+        ldgs = simulate_loadings(n_indicators, latent_size)
+        ints, n_cats = simulate_graded_intercepts(n_items)
         
         np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
         np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
         np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
+        
+        subprocess.call(["Rscript", "sim_mirt_data.R", model_type, sample_size, expected_dir, data_dir])
+        Y = np.loadtxt(os.path.join(data_dir, "data.csv"), delimiter = ",")
+        Y = torch.from_numpy(Y)
     else:
         if model_type != "normal":
-            ldgs = simulate_loadings(n_indicators, latent_size, shrink = True).to(device)
-            ints = simulate_non_graded_intercepts(n_items, all_positive = True).to(device)
+            ldgs = simulate_loadings(n_indicators, latent_size, shrink = True)
+            ints = simulate_non_graded_intercepts(n_items, all_positive = True)
             if model_type == "negative_binomial":
-                sim_kwargs = {"probs" : pydist.Uniform(0.5, 0.7).sample([n_items]).to(device)}
+                sim_kwargs = {"probs" : pydist.Uniform(0.5, 0.7).sample([n_items])}
             elif model_type == "lognormal":
-                sim_kwargs = {"residual_std" : pydist.Uniform(1, 1.2).sample([n_items]).to(device)}
+                sim_kwargs = {"residual_std" : pydist.Uniform(1, 1.2).sample([n_items])}
         else:
-            ldgs = simulate_loadings(n_indicators, latent_size).to(device)
-            ints = simulate_non_graded_intercepts(n_items).to(device)
-            sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items]).to(device)}
+            ldgs = simulate_loadings(n_indicators, latent_size)
+            ints = simulate_non_graded_intercepts(n_items)
+            sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items])}
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         
