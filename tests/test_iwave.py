@@ -40,7 +40,7 @@ def test_latent_sizes(latent_size, model_type, device):
         ints, n_cats = generate_graded_intercepts(n_items).to(device)
         iwave_kwargs = {"n_cats" : n_cats}
     else:
-        iwave_kwargs = {"n_items" : n_items}=
+        iwave_kwargs = {"n_items" : n_items}
         
         if model_type != "normal":
             ldgs = generate_loadings(n_indicators, latent_size, shrink = True).to(device)
@@ -56,8 +56,7 @@ def test_latent_sizes(latent_size, model_type, device):
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         
-    imodel = IWAVE(
-                   learning_rate = 1e-3,
+    imodel = IWAVE(learning_rate = 1e-3,
                    device = device,
                    model_type = model_type,
                    input_size = n_items,
