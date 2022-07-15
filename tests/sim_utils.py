@@ -204,6 +204,7 @@ def simulate_and_save_data(model_type:   str,
     if model_type in ("grm", "gpcm"):
         ldgs = simulate_loadings(n_indicators, latent_size)
         ints, n_cats = simulate_graded_intercepts(n_items)
+        iwave_kwargs = {"n_cats" : n_cats}
         
         np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
         np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
@@ -213,6 +214,8 @@ def simulate_and_save_data(model_type:   str,
         Y = np.loadtxt(os.path.join(data_dir, "data.csv"), delimiter = ",")
         Y = torch.from_numpy(Y)
     else:
+        iwave_kwargs = {"n_items" : n_items}
+        
         if model_type != "normal":
             ldgs = simulate_loadings(n_indicators, latent_size, shrink = True)
             ints = simulate_non_graded_intercepts(n_items, all_positive = True)
@@ -234,4 +237,4 @@ def simulate_and_save_data(model_type:   str,
             np.savetxt(os.path.join(expected_dir, k + ".csv"), v.numpy(), delimiter = ",")
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
         
-    return Y
+    return Y, iwave_kwargs
