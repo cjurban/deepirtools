@@ -175,12 +175,32 @@ def simulate_non_graded_intercepts(n_items: int,
     return torch.randn(n_items).mul(0.1)
 
 
-def simulate_and_save_data(n_indicators: int,
+def simulate_covariance_matrix(latent_size: int,
+                               cov_type:    int,
+                               ):
+    assert(cov_type in (0, 1, 2))
+    if cov_type == 0:
+        cov_mat = torch.eye(self.latent_size)
+    if cov_type == 1:
+        cov_mat = torch.ones([latent_size, latent_size]).mul(0.3)
+        cov_mat.fill_diagonal_(1)
+    if cov_type == 2:
+        L = torch.randn([latent_size, latent_size]).tril()
+        cov_mat = torch.mm(L, L.T)
+        
+    return cov_mat
+
+
+def simulate_and_save_data(model_type:   str,
+                           n_indicators: int,
                            latent_size:  int,
+                           cov_type:     int,
                            expected_dir: str,
                            data_dir:     str,
                           ):
     n_items = int(n_indicators * latent_size)
+    cov_mat = simulate_covariance_matrix(latent_size, cov_type)
+    
     if model_type in ("grm", "gpcm"):
         ldgs = simulate_loadings(n_indicators, latent_size).to(device)
         ints, n_cats = simulate_graded_intercepts(n_items); ints = ints.to(device)
@@ -209,29 +229,5 @@ def simulate_and_save_data(n_indicators: int,
         for k, v in sim_kwargs.items():
             np.savetxt(os.path.join(expected_dir, k + ".csv"), v.numpy(), delimiter = ",")
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
-#
-#    
-#class CovarianceMatrixSimulator(BaseParamSimulator):
-#    
-#    def __init__(self,
-#                 latent_size: int,
-#                ):
-#        super().__init__()
-#        
-#        self.latent_size = latent_size
-#        
-#    @torch.no_grad()
-#    def sample(self):
-#        cov_mat_list = []
-#        for i in range(3):
-#            if i == 0:
-#                cov_mat = torch.eye(self.latent_size)
-#            if i == 1:
-#                cov_mat = torch.ones([self.latent_size, self.latent_size]).mul(0.3)
-#                cov_mat.fill_diagonal_(1)
-#            if i == 2:
-#                L = torch.randn([latent_size, latent_size]).tril()
-#                cov_mat = torch.mm(L, L.T)
-#            cov_mat_list.append(cov_mat)
-#            
-#        return cov_mat_list
+        
+    return Y
