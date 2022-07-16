@@ -139,6 +139,8 @@ def simulate_loadings(n_indicators: int,
     ldgs = ldgs_dist.sample() * mask
     if shrink:
         ldgs.mul_(0.3).clamp_(max = 0.7)
+    else:
+        ldgs.clamp(max = 2.2)
 
     return ldgs
 

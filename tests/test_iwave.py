@@ -56,20 +56,18 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
     if latent_size > 1:
         if cov_type == 0:
             rotator = Rotator(method = "varimax")
-            est_cov_mat = None
         elif cov_type == 1:
             rotator = Rotator(method = "geomin_obl")
         est_ldgs = rotator.fit_transform(model.loadings.numpy())
-        est_cov_mat = rotator.phi_
         est_ldgs = torch.from_numpy(est_ldgs)
-        if est_cov_mat is not None:
-            est_cov_mat = torch.from_numpy(est_cov_mat)
+        if cov_type == 1:
+            est_cov_mat = torch.from_numpy(rotator.phi_)
     else:
         est_ldgs = model.loadings
         est_cov_mat = None
     est_ints = model.intercepts
     
-    assert(invert_factors(est_ldgs).add(-exp_ldgs).abs().le(abs_tol).all())
+    assert(invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs().le(abs_tol).all())
     assert(est_ints.add(-exp_ints).abs().le(abs_tol).all())
-    if est_cov_mat is not None:
+    if cov_type == 1:
         assert(invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat.abs().le(abs_tol).all()))
