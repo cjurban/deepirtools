@@ -2,9 +2,10 @@ import os
 from os.path import join
 import pytest
 import torch
+import deepirtools
 from deepirtools import IWAVE
-from factor_analyzer import Rotator
 from deepirtools.utils import *
+from factor_analyzer import Rotator
 from sim_utils import *
 
 
@@ -35,7 +36,7 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
     os.makedirs(_data_dir, exist_ok = True)
     
     Y, iwave_kwargs = simulate_and_save_data(model_type, n_indicators, latent_size, cov_type,
-                                             _expected_dir, _data_dir)
+                                             sample_size, _expected_dir, _data_dir)
         
     model = IWAVE(learning_rate = 1e-3,
                   device = device,
@@ -58,8 +59,11 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
             est_cov_mat = None
         elif cov_type == 1:
             rotator = Rotator(method = "geomin_obl")
-        est_ldgs = rotator.fit_transform(model.loadings)
+        est_ldgs = rotator.fit_transform(model.loadings.numpy())
         est_cov_mat = rotator.phi_
+        est_ldgs = torch.from_numpy(est_ldgs)
+        if est_cov_mat is not None:
+            est_cov_mat = torch.from_numpy(est_cov_mat)
     else:
         est_ldgs = model.loadings
         est_cov_mat = None
@@ -69,4 +73,3 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
     assert(est_ints.add(-exp_ints).abs().le(abs_tol).all())
     if est_cov_mat is not None:
         assert(invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat.abs().le(abs_tol).all()))
-    
