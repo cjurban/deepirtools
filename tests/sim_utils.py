@@ -229,21 +229,3 @@ def simulate_and_save_data(model_type:      str,
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
         
     return Y
-
-
-def match_columns(inp_mat: torch.Tensor,
-                  ref_mat: torch.Tensor,
-                 ):
-    """Permute cols. of input matrix to best match cols. of reference matrix."""
-    assert(len(inp_mat.shape) == 2), "Input matrix must be 2D."
-    assert(len(ref_mat.shape) == 2), "Reference matrix must be 2D."
-    inp_mat = invert_factors(inp_mat.clone()).numpy()
-    ref_mat = invert_factors(ref_mat.clone()).numpy()
-    
-    cost_mat = np.empty((ref_mat.shape[1], ref_mat.shape[1], ))
-    cost_mat[:] = np.nan
-    for ref_col in range(ref_mat.shape[1]): 
-        for inp_col in range(inp_mat.shape[1]): 
-            cost_mat[ref_col, inp_col] = np.sum((ref_mat[:, ref_col] - inp_mat[:, inp_col])**2)
-    
-    return torch.from_numpy(inp_mat[:, linear_sum_assignment(cost_mat)[1]])

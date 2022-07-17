@@ -6,7 +6,7 @@ import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import *
 from factor_analyzer import Rotator
-from test_utils import *
+from sim_utils import *
 
 
 ABS_TOL = 0.1
