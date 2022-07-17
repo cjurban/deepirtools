@@ -6,19 +6,20 @@ import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import *
 from factor_analyzer import Rotator
-from sim_utils import *
+from test_utils import *
 
 
-abs_tol = 0.1
-expected_dir = "expected"
-data_dir = "data"
+ABS_TOL = 0.1
+EXPECTED_DIR = "expected"
+DATA_DIR = "data"
 
-deepirtools.manual_seed(1234)
+
+deepirtools.manual_seed(123)
 devices = ["cpu"]
 if torch.cuda.is_available():
     devices.append("cuda")
 
-sample_size = 1000
+sample_size = 10000
 n_indicators = 5
 
 
@@ -27,17 +28,31 @@ n_indicators = 5
 @pytest.mark.parametrize("cov_type", [0, 1])
 @pytest.mark.parametrize("latent_size", [1, 5])
 @pytest.mark.parametrize("device", devices)
-def test_exploratory_iwave(model_type, latent_size, cov_type, device):
-    _expected_dir = os.path.join(expected_dir, "exploratory", "model_type_{}".format(model_type),
-                                 "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
-    _data_dir = os.path.join(data_dir, "exploratory", "model_type_{}".format(model_type),
-                             "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
-    os.makedirs(_expected_dir, exist_ok = True)
-    os.makedirs(_data_dir, exist_ok = True)
+@pytest.mark.parametrize("all_same_n_cats", [True, False])
+def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n_cats):
+    if cov_type == 1 and latent_size == 1:
+        return
+    if model_type not in ("grm", "gpcm") and not all_same_n_cats:
+        return
     
-    Y, iwave_kwargs = simulate_and_save_data(model_type, n_indicators, latent_size, cov_type,
-                                             sample_size, _expected_dir, _data_dir)
-        
+    expected_dir = os.path.join(EXPECTED_DIR, "exploratory", "model_type_{}".format(model_type),
+                                "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
+    data_dir = os.path.join(DATA_DIR, "exploratory", "model_type_{}".format(model_type),
+                            "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
+    os.makedirs(expected_dir, exist_ok = True)
+    os.makedirs(data_dir, exist_ok = True)
+    
+    Y = simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
+                               expected_dir, data_dir, all_same_n_cats)
+    
+    n_items = Y.shape[1]
+    if model_type in ("grm", "gpcm"):
+        n_cats = np.loadtxt(os.path.join(expected_dir, "n_cats.csv"),
+                            delimiter = ",").astype(int).tolist()
+        iwave_kwargs = {"n_cats" : n_cats}
+    else:
+        iwave_kwargs = {"n_items" : n_items}
+
     model = IWAVE(learning_rate = 1e-3,
                   device = device,
                   model_type = model_type,
@@ -48,26 +63,32 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device):
                   )
     model.fit(Y, batch_size = 128, iw_samples = 5)
     
-    exp_params = (np.loadtxt(os.path.join(_expected_dir, "ldgs.csv"), delimiter = ","),
-                  np.loadtxt(os.path.join(_expected_dir, "ints.csv"), delimiter = ","),
-                  np.loadtxt(os.path.join(_expected_dir, "cov_mat.csv"), delimiter = ","))
+    exp_params = (np.loadtxt(os.path.join(expected_dir, "ldgs.csv"), delimiter = ","),
+                  np.loadtxt(os.path.join(expected_dir, "ints.csv"), delimiter = ","),
+                  np.loadtxt(os.path.join(expected_dir, "cov_mat.csv"), delimiter = ","))
     exp_ldgs, exp_ints, exp_cov_mat = (torch.from_numpy(p) for p in exp_params)
+    if model_type in ("grm", "gpcm"):
+        exp_ints = -exp_ints
     
     if latent_size > 1:
         if cov_type == 0:
             rotator = Rotator(method = "varimax")
         elif cov_type == 1:
             rotator = Rotator(method = "geomin_obl")
-        est_ldgs = rotator.fit_transform(model.loadings.numpy())
-        est_ldgs = torch.from_numpy(est_ldgs)
-        if cov_type == 1:
-            est_cov_mat = torch.from_numpy(rotator.phi_)
+        est_ldgs = torch.from_numpy(rotator.fit_transform(model.loadings.numpy()))
+        est_cov_mat = (torch.from_numpy(rotator.phi_) if cov_type == 1 else None)
+            
     else:
         est_ldgs = model.loadings
         est_cov_mat = None
+        exp_ldgs = exp_ldgs.unsqueeze(1)
+        
     est_ints = model.intercepts
     
-    assert(invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs().le(abs_tol).all())
-    assert(est_ints.add(-exp_ints).abs().le(abs_tol).all())
-    if cov_type == 1:
-        assert(invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat.abs().le(abs_tol).all()))
+    ldgs_err = invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs()
+    ints_err = est_ints.add(-exp_ints).abs()
+    assert(ldgs_err.mean().le(ABS_TOL).all())
+    assert(ints_err.mean().le(ABS_TOL).all())
+    if est_cov_mat is not None:
+        cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).abs()
+        assert(cov_err.mean().le(ABS_TOL).all())

@@ -130,18 +130,11 @@ SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
     
 def simulate_loadings(n_indicators: int,
                       latent_size:  int,
-                      shrink:       bool = False,
                      ):
     n_items = int(n_indicators * latent_size)
     mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
-    ldgs_dist = pydist.LogNormal(loc = torch.zeros([n_items, latent_size]),
-                                 scale = torch.ones([n_items, latent_size]).mul(0.5))
-    ldgs = ldgs_dist.sample() * mask
-    if shrink:
-        ldgs.mul_(0.3).clamp_(max = 0.7)
-    else:
-        ldgs.clamp(max = 2.2)
-
+    ldgs = pydist.Uniform([0.5, 1.7]).sample([n_items, latent_size]).mul(mask)
+    
     return ldgs
 
 
@@ -170,15 +163,6 @@ def simulate_graded_intercepts(n_items: int,
         padded_ints.append(padded_tmp)
 
     return torch.cat(ints, dim = 0), torch.cat(padded_ints, dim = 0), n_cats
-
-
-def simulate_non_graded_intercepts(n_items: int,
-                                   all_positive: bool = False,
-                                  ):
-    if all_positive:
-        return pydist.Uniform(0.1, 0.5).sample([n_items])
-    
-    return torch.randn(n_items).mul(0.1)
 
 
 def simulate_covariance_matrix(latent_size: int,
@@ -212,40 +196,54 @@ def simulate_and_save_data(model_type:      str,
     if model_type in ("grm", "gpcm"):
         ldgs = simulate_loadings(n_indicators, latent_size)
         ints, ints_reshape, n_cats = simulate_graded_intercepts(n_items, all_same_n_cats = all_same_n_cats)
-        iwave_kwargs = {"n_cats" : n_cats}
-        
-        np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
-        np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
         ints_reshape = ints_reshape.numpy().astype(str)
         ints_reshape[ints_reshape == "nan"] = "NA"
         np.savetxt(os.path.join(expected_dir, "ints_reshape.csv"), ints_reshape, delimiter = ",", fmt = "%s")
-        np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
-        
-        subprocess.call(["Rscript", "sim_mirt_data.R", model_type, str(sample_size), expected_dir, data_dir])
-        Y = np.loadtxt(os.path.join(data_dir, "data.csv"), delimiter = ",")
-        Y = torch.from_numpy(Y)
+        np.savetxt(os.path.join(expected_dir, "n_cats.csv"), np.asarray(n_cats), delimiter = ",")
     else:
-        iwave_kwargs = {"n_items" : n_items}
-        
+        sim_kwargs = {}
         if model_type != "normal":
-            ldgs = simulate_loadings(n_indicators, latent_size, shrink = True)
-            ints = simulate_non_graded_intercepts(n_items, all_positive = True)
+            ldgs = simulate_loadings(n_indicators, latent_size).mul_(0.4)
+            ints = pydist.Uniform(0.1, 0.5).sample([n_items])
             if model_type == "negative_binomial":
-                sim_kwargs = {"probs" : pydist.Uniform(0.5, 0.7).sample([n_items])}
+                sim_kwargs["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items])
             elif model_type == "lognormal":
-                sim_kwargs = {"residual_std" : pydist.Uniform(1, 1.2).sample([n_items])}
+                sim_kwargs["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items])
         else:
             ldgs = simulate_loadings(n_indicators, latent_size)
-            ints = simulate_non_graded_intercepts(n_items)
-            sim_kwargs = {"residual_std" : pydist.Uniform(0.6, 0.8).sample([n_items])}
-        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
-                                   cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
-        
-        np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
-        np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
-        np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
+            ints = torch.randn(n_items).mul(0.1)
+            sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items])
         for k, v in sim_kwargs.items():
             np.savetxt(os.path.join(expected_dir, k + ".csv"), v.numpy(), delimiter = ",")
+        
+    np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
+    np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
+    np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
+    
+    if model_type in ("grm", "gpcm"):
+        subprocess.call(["Rscript", "sim_mirt_data.R", model_type, str(sample_size), expected_dir, data_dir])
+        Y = torch.from_numpy(np.loadtxt(os.path.join(data_dir, "data.csv"), delimiter = ","))
+    else:
+        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
+                                   cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
         
-    return Y, iwave_kwargs
+    return Y
+
+
+def match_columns(inp_mat: torch.Tensor,
+                  ref_mat: torch.Tensor,
+                 ):
+    """Permute cols. of input matrix to best match cols. of reference matrix."""
+    assert(len(inp_mat.shape) == 2), "Input matrix must be 2D."
+    assert(len(ref_mat.shape) == 2), "Reference matrix must be 2D."
+    inp_mat = invert_factors(inp_mat.clone()).numpy()
+    ref_mat = invert_factors(ref_mat.clone()).numpy()
+    
+    cost_mat = np.empty((ref_mat.shape[1], ref_mat.shape[1], ))
+    cost_mat[:] = np.nan
+    for ref_col in range(ref_mat.shape[1]): 
+        for inp_col in range(inp_mat.shape[1]): 
+            cost_mat[ref_col, inp_col] = np.sum((ref_mat[:, ref_col] - inp_mat[:, inp_col])**2)
+    
+    return torch.from_numpy(inp_mat[:, linear_sum_assignment(cost_mat)[1]])
