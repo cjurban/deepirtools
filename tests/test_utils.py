@@ -133,7 +133,7 @@ def simulate_loadings(n_indicators: int,
                      ):
     n_items = int(n_indicators * latent_size)
     mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
-    ldgs = pydist.Uniform([0.5, 1.7]).sample([n_items, latent_size]).mul(mask)
+    ldgs = pydist.Uniform(0.5, 1.7).sample([n_items, latent_size]).mul(mask)
     
     return ldgs
 
