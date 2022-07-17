@@ -162,7 +162,7 @@ def simulate_graded_intercepts(n_items: int,
         padded_tmp = F.pad(tmp.flip(-1), (0, max(n_cats) - n_cat), value = float("nan"))
         padded_ints.append(padded_tmp)
 
-    return torch.cat(ints, dim = 0), torch.cat(padded_ints, dim = 0), n_cats
+    return torch.cat(ints, dim = 1), torch.cat(padded_ints, dim = 0), n_cats
 
 
 def simulate_covariance_matrix(latent_size: int,
