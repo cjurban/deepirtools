@@ -30,6 +30,7 @@ n_indicators = 5
 @pytest.mark.parametrize("device", devices)
 @pytest.mark.parametrize("all_same_n_cats", [True, False])
 def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n_cats):
+    """Test parameter recovery in the exploratory setting."""
     if cov_type == 1 and latent_size == 1:
         return
     if model_type not in ("grm", "gpcm") and not all_same_n_cats:
@@ -52,8 +53,11 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         iwave_kwargs = {"n_cats" : n_cats}
     else:
         iwave_kwargs = {"n_items" : n_items}
+    lr = (0.1/(latent_size+1))*5**-1
+    if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
+        lr *= 1e-2
 
-    model = IWAVE(learning_rate = 1e-3,
+    model = IWAVE(learning_rate = lr,
                   device = device,
                   model_type = model_type,
                   input_size = n_items,
@@ -76,13 +80,11 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         elif cov_type == 1:
             rotator = Rotator(method = "geomin_obl")
         est_ldgs = torch.from_numpy(rotator.fit_transform(model.loadings.numpy()))
-        est_cov_mat = (torch.from_numpy(rotator.phi_) if cov_type == 1 else None)
-            
+        est_cov_mat = (torch.from_numpy(rotator.phi_) if cov_type == 1 else None)  
     else:
         est_ldgs = model.loadings
         est_cov_mat = None
         exp_ldgs = exp_ldgs.unsqueeze(1)
-        
     est_ints = model.intercepts
     
     ldgs_err = invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs()

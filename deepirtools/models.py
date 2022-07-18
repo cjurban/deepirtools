@@ -83,53 +83,40 @@ class LinearConstraints(nn.Module):
         return F.linear(self.free_weight, self.A, self.b).view(self.in_features, self.out_features).T
 
 
-class CatBiasReshape(nn.Module):
+class CategoricalBias(nn.Module):
     
     def __init__(self,
                  n_cats: List[int],
                  mask: Optional[torch.Tensor] = None,
                 ):
-        """Biases (i.e., intercepts) for graded response models. Reshaping makes computatiton faster."""
-        super(CatBiasReshape, self).__init__()
+        """Biases (i.e., intercepts) for categorical response models."""
+        super(CategoricalBias, self).__init__()
         self.n_cats = n_cats
+        M = max(n_cats)
+        n_items = len(n_cats)
         
-        # Biases.
-        bias = torch.empty(sum([n_cat - 1 for n_cat in n_cats]))
         if mask is None:
-            mask = torch.ones_like(bias)
-        idxs = np.cumsum([n_cat - 1 for n_cat in ([1] + n_cats)])
-        bias.data = torch.cat([get_thresholds([mask[idx].item() * -4, 4], n_cat) for
-                                               idx, n_cat in zip(idxs[:-1], n_cats)], dim = 0)
+            mask = torch.ones([n_items, 1])
+        bias_list = []
+        for i, n_cat in enumerate(n_cats):
+            thresholds = get_thresholds([mask[i].item() * -4, 4], n_cat)
+            bias_list.append(F.pad(thresholds, (0, M - n_cat),
+                                   value = float("inf"))) # Inf. saturates exponentials.
+        self._bias = nn.Parameter(torch.stack(bias_list, dim = 0))
+        self.register_buffer("mask", torch.cat([mask, torch.ones([n_items, M - 1])], dim = 1))
         
-        # Infinity saturates exponentials.
-        bias_reshape, sliced_bias = self._reshape(bias, idxs, float("inf"))
-        self.bias_reshape = nn.Parameter(bias_reshape)
-        self.register_buffer("mask", self._reshape(mask, idxs, 1., False))
-        
-        # Drop indices.
-        nan_mask = torch.cat([F.pad(_slice, (0, max(self.n_cats) - _slice.size(0) - 1),
-                                    value=float("nan")).unsqueeze(0) for
-                                    _slice in sliced_bias], axis = 0)
-        self.register_buffer("drop_idxs", ~nan_mask.view(-1).isnan())
-        
-    def _reshape(self, t, idxs, pad_val, return_slices=True):
-        sliced_t = [t[idxs[i]:idxs[i + 1]] for i in range(len(idxs) - 1)]
-        t_reshape = torch.cat([F.pad(_slice,
-                                     (0, max(self.n_cats) - _slice.size(0) - 1),
-                                      value=pad_val).unsqueeze(0) for
-                                      _slice in sliced_t], axis = 0)
-        if return_slices:
-            return t_reshape, sliced_t
-        return t_reshape
+        nan_mask = torch.where(bias.isinf(), torch.ones_like(bias) * float("nan"),
+                               torch.ones_like(bias))
+        self.register_buffer("nan_mask", nan_mask)
 
     def forward(self,
                 x: torch.Tensor,
                ):
-        return (self.bias_reshape * self.mask) + x
+        return (self._bias * self.mask) + x
     
     @property
     def bias(self):
-        return (self.bias_reshape.view(-1) * self.mask.view(-1))[self.drop_idxs]
+        return (self._bias * self.nan_mask)
 
     
 ################################################################################
@@ -173,7 +160,11 @@ class GradedBaseModel(nn.Module):
         self.Q = Q
         self.A = A
         
-        self._intercepts = CatBiasReshape(n_cats, ints_mask)
+        if ints_mask is not None:
+            assert(ints_mask.numel() == len(n_cats)), "ints_mask must be same size as number of items."
+            ints_mask = ints_mask.clone().view(-1, 1)
+            assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
+        self._intercepts = CategoricalBias(n_cats, ints_mask)
         self.n_cats = n_cats
         
         self.reset_parameters()
@@ -189,10 +180,6 @@ class GradedBaseModel(nn.Module):
     @property
     def loadings(self):
         return self._loadings.weight.data
-    
-    @property
-    def intercepts(self):
-        return self._intercepts.bias.data
     
     
 class GradedResponseModel(GradedBaseModel):
@@ -227,6 +214,10 @@ class GradedResponseModel(GradedBaseModel):
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
     
+    @property
+    def intercepts(self):
+        return self._intercepts.bias.data
+    
     
 class GeneralizedPartialCreditModel(GradedBaseModel):
     
@@ -253,7 +244,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         shape = Bx.shape + torch.Size([M])
         kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
         
-        cum_bias = self._intercepts.bias_reshape.cumsum(dim = 1)
+        cum_bias = self._intercepts.bias.cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
         tmp = kBx - cum_bias
         
@@ -264,6 +255,10 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         if mask is not None:
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
+    
+    @property
+    def intercepts(self):
+        return self._intercepts.bias.cumsum(dim = 1).data
     
     
 class NonGradedBaseModel(nn.Module):
@@ -301,7 +296,7 @@ class NonGradedBaseModel(nn.Module):
         self.A = A
         
         self._bias = nn.Parameter(torch.empty(n_items))
-        self.ints_mask = ints_mask
+        self.ints_mask = ints_mask # assert binary
         
         self._reset_parameters()
         

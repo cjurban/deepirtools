@@ -155,11 +155,11 @@ def simulate_graded_intercepts(n_items: int,
             cuts = torch.linspace(-4, 4, n_cat)
             d = 4 / (n_cat - 1)
             tmp = (pydist.Uniform(-d, d).sample([1, n_cat - 1]) +
-                   0.5 * (cuts[1:] + cuts[:-1]))
+                   0.5 * (cuts[1:] + cuts[:-1])).flip(-1)
         else:
-            tmp = pydist.Uniform(-1.5, 1.5).sample([1, 1])
+            tmp = pydist.Uniform(-1.5, 1.5).sample([1, 1]).flip(-1)
         ints.append(tmp)
-        padded_tmp = F.pad(tmp.flip(-1), (0, max(n_cats) - n_cat), value = float("nan"))
+        padded_tmp = F.pad(tmp, (0, max(n_cats) - n_cat), value = float("nan"))
         padded_ints.append(padded_tmp)
 
     return torch.cat(ints, dim = 1), torch.cat(padded_ints, dim = 0), n_cats
