@@ -86,6 +86,8 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         est_cov_mat = None
         exp_ldgs = exp_ldgs.unsqueeze(1)
     est_ints = model.intercepts
+    if model_type == "gpcm":
+        est_ints = est_ints.cumsum(dim = 1)
     
     ldgs_err = invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()

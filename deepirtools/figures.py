@@ -96,7 +96,7 @@ def screeplot(latent_sizes:             List[int],
     return ll_list
 
     
-def loadings_heatmap(loadings:     np.ndarray,
+def loadings_heatmap(loadings:     torch.Tensor,
                      x_label:      str = "Factor", 
                      y_label:      str = "Item", 
                      title:        str = "Factor Loadings"):
