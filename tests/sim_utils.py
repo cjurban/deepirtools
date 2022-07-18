@@ -149,20 +149,17 @@ def simulate_graded_intercepts(n_items: int,
         n_cats = cats * (n_items // len(cats)) + cats[:n_items % len(cats)]
 
     ints = []
-    padded_ints = []
     for n_cat in n_cats:
         if n_cat > 2:
-            cuts = torch.linspace(-4, 4, n_cat)
+            cuts = torch.linspace(-3, 3, n_cat)
             d = 4 / (n_cat - 1)
             tmp = (pydist.Uniform(-d, d).sample([1, n_cat - 1]) +
                    0.5 * (cuts[1:] + cuts[:-1])).flip(-1)
         else:
             tmp = pydist.Uniform(-1.5, 1.5).sample([1, 1]).flip(-1)
-        ints.append(tmp)
-        padded_tmp = F.pad(tmp, (0, max(n_cats) - n_cat), value = float("nan"))
-        padded_ints.append(padded_tmp)
+        ints.append(F.pad(tmp, (0, max(n_cats) - n_cat), value = float("nan")))
 
-    return torch.cat(ints, dim = 1), torch.cat(padded_ints, dim = 0), n_cats
+    return torch.cat(ints, dim = 0), n_cats
 
 
 def simulate_covariance_matrix(latent_size: int,
@@ -195,10 +192,10 @@ def simulate_and_save_data(model_type:      str,
     
     if model_type in ("grm", "gpcm"):
         ldgs = simulate_loadings(n_indicators, latent_size)
-        ints, ints_reshape, n_cats = simulate_graded_intercepts(n_items, all_same_n_cats = all_same_n_cats)
-        ints_reshape = ints_reshape.numpy().astype(str)
-        ints_reshape[ints_reshape == "nan"] = "NA"
-        np.savetxt(os.path.join(expected_dir, "ints_reshape.csv"), ints_reshape, delimiter = ",", fmt = "%s")
+        ints, n_cats = simulate_graded_intercepts(n_items, all_same_n_cats = all_same_n_cats)
+        ints_R = ints.numpy().astype(str)
+        ints_R[ints_R == "nan"] = "NA"
+        np.savetxt(os.path.join(expected_dir, "ints_R.csv"), ints_R, delimiter = ",", fmt = "%s")
         np.savetxt(os.path.join(expected_dir, "n_cats.csv"), np.asarray(n_cats), delimiter = ",")
     else:
         sim_kwargs = {}

@@ -103,10 +103,10 @@ class CategoricalBias(nn.Module):
             bias_list.append(F.pad(thresholds, (0, M - n_cat),
                                    value = float("inf"))) # Inf. saturates exponentials.
         self._bias = nn.Parameter(torch.stack(bias_list, dim = 0))
-        self.register_buffer("mask", torch.cat([mask, torch.ones([n_items, M - 1])], dim = 1))
+        self.register_buffer("mask", torch.cat([mask, torch.ones([n_items, M - 2])], dim = 1))
         
-        nan_mask = torch.where(bias.isinf(), torch.ones_like(bias) * float("nan"),
-                               torch.ones_like(bias))
+        nan_mask = torch.where(self._bias.isinf(), torch.ones_like(self._bias) * float("nan"),
+                               torch.ones_like(self._bias))
         self.register_buffer("nan_mask", nan_mask)
 
     def forward(self,
@@ -181,6 +181,10 @@ class GradedBaseModel(nn.Module):
     def loadings(self):
         return self._loadings.weight.data
     
+    @property
+    def intercepts(self):
+        return self._intercepts.bias.data
+    
     
 class GradedResponseModel(GradedBaseModel):
     
@@ -214,10 +218,6 @@ class GradedResponseModel(GradedBaseModel):
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
     
-    @property
-    def intercepts(self):
-        return self._intercepts.bias.data
-    
     
 class GeneralizedPartialCreditModel(GradedBaseModel):
     
@@ -244,7 +244,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         shape = Bx.shape + torch.Size([M])
         kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
         
-        cum_bias = self._intercepts.bias.cumsum(dim = 1)
+        cum_bias = self._intercepts._bias.cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
         tmp = kBx - cum_bias
         
@@ -255,10 +255,6 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         if mask is not None:
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
-    
-    @property
-    def intercepts(self):
-        return self._intercepts.bias.cumsum(dim = 1).data
     
     
 class NonGradedBaseModel(nn.Module):

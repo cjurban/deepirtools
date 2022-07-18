@@ -8,4 +8,4 @@ from .utils import (manual_seed,
                     normalize_ints)
 from .figures import *
 
-__version__ = "1.1.9"
+__version__ = "1.1.14"

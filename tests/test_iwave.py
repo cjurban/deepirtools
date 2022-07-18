@@ -88,7 +88,7 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
     est_ints = model.intercepts
     
     ldgs_err = invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs()
-    ints_err = est_ints.add(-exp_ints).abs()
+    ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
     assert(ldgs_err.mean().le(ABS_TOL).all())
     assert(ints_err.mean().le(ABS_TOL).all())
     if est_cov_mat is not None:
