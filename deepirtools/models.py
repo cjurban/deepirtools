@@ -5,7 +5,6 @@ import torch.nn.functional as F
 import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
-import numpy as np
 from deepirtools.utils import get_thresholds
 from typing import List, Optional
 from itertools import chain
@@ -484,10 +483,10 @@ class Spherical(nn.Module):
             n_elts = int((size * (size + 1)) / 2)
             self.theta = nn.Parameter(torch.zeros([n_elts]))
             diag_idxs = torch.arange(1, size + 1).cumsum(dim = 0) - 1
-            self.theta.data[diag_idxs] = np.log(np.pi / 2)
+            self.theta.data[diag_idxs] = math.log(math.pi / 2)
             
             tril_idxs = torch.tril_indices(row = size - 1, col = size - 1, offset = 0)
-            uncorrelated_factors = [factor for factor in np.arange(size).tolist() if factor not in correlated_factors]
+            uncorrelated_factors = [factor for factor in [i for i in range(size)] if factor not in correlated_factors]
             self.uncorrelated_tril_idxs = tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
                                                            factor in uncorrelated_factors) > 0]
             
@@ -513,14 +512,14 @@ class Spherical(nn.Module):
             # Ensure the parameterization is unique.
             exp_theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
             exp_theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta.exp()
-            lower_tri_l_mat = (np.pi * exp_theta_mat) / (1 + theta_mat.exp())
+            lower_tri_l_mat = (math.pi * exp_theta_mat) / (1 + theta_mat.exp())
             l_mat = exp_theta_mat.diag().diag_embed() + lower_tri_l_mat.tril(diagonal = -1)
 
             if self.fixed_variances:
                 l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.theta.device)
             
             # Constrain specific correlations to zero.
-            l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = np.pi / 2
+            l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = math.pi / 2
         
             return self.cart2spher(l_mat)
         else:
