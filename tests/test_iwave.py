@@ -91,7 +91,7 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         est_cov_mat = None
         exp_ldgs = exp_ldgs.unsqueeze(1)
     est_ints = model.intercepts
-    if model_type == "gpcm" and len(exp_ints.shape) > 1:
+    if model_type == "gpcm" and len(exp_ints.shape) == 2:
         if exp_ints.shape[1] > 1:
             est_ints = est_ints.cumsum(dim = 1)
     
