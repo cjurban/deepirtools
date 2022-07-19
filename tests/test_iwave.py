@@ -51,9 +51,9 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
     
     simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
                            expected_dir, data_dir, all_same_n_cats)
-    exp_params = [load_torch_from_csv(k + ".csv", expected_dir) for k in ("ldgs", "ints", "cov_mat")]
-    exp_ldgs, exp_ints, exp_cov_mat = (torch.from_numpy(p) for p in exp_params)
-    Y = load_torch_from_csv("data.csv", expected_dir)
+    exp_ldgs, exp_ints, exp_cov_mat = (load_torch_from_csv(k + ".csv", expected_dir) for
+                                       k in ("ldgs", "ints", "cov_mat"))
+    Y = load_torch_from_csv("data.csv", data_dir)
     
     n_items = Y.shape[1]
     lr = (0.1/(latent_size+1))*5**-1

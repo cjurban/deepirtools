@@ -222,7 +222,7 @@ def simulate_and_save_data(model_type:      str,
     if model_type in ("grm", "gpcm"):
         subprocess.call(["Rscript", "sim_mirt_data.R", model_type, str(sample_size), expected_dir, data_dir])
     else:
-        sim_kwargs = {(k, v) for k, v in params.items() if k not in ("ldgs", "ints", "cov_mat")}
-        Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
-                                   cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
+        sim_kwargs = {k : v for k, v in params.items() if k not in ("ldgs", "ints", "cov_mat")}
+        Y = SIMULATORS[model_type](loadings = params["ldgs"], intercepts = params["ints"],
+                                   cov_mat = params["cov_mat"], **sim_kwargs).sample(sample_size)
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
