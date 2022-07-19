@@ -14,6 +14,7 @@ class BaseFactorModelSimulator():
                  intercepts: torch.Tensor,
                  cov_mat:    torch.Tensor,
                 ):
+        """Base class for simulating from a latent factor model."""
         super(BaseFactorModelSimulator, self).__init__()
 
         self.loadings = loadings
@@ -31,6 +32,7 @@ class PoissonFactorModelSimulator(BaseFactorModelSimulator):
                  intercepts: torch.Tensor,
                  cov_mat:    torch.Tensor,
                 ):
+        """ Simulate from a Poisson factor model."""
         super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
         
     @torch.no_grad()    
@@ -54,6 +56,7 @@ class NegativeBinomialFactorModelSimulator(BaseFactorModelSimulator):
                  cov_mat:    torch.Tensor,
                  probs:      torch.Tensor,
                 ):
+        """Simulate from a negative binomial factor model."""
         super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
         
         self.probs = probs
@@ -79,6 +82,7 @@ class NormalFactorModelSimulator(BaseFactorModelSimulator):
                  cov_mat:      torch.Tensor,
                  residual_std: torch.Tensor
                 ):
+        """Simulate from a normal factor model."""
         super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
         
         self.residual_std = residual_std
@@ -104,6 +108,7 @@ class LogNormalFactorModelSimulator(BaseFactorModelSimulator):
                  cov_mat:      torch.Tensor,
                  residual_std: torch.Tensor
                 ):
+        """Simulate from a lognormal factor model."""
         super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
         
         self.residual_std = residual_std
@@ -131,6 +136,7 @@ SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
 def simulate_loadings(n_indicators: int,
                       latent_size:  int,
                      ):
+    """Simulate a factor loadings matrix."""
     n_items = int(n_indicators * latent_size)
     mask = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
     ldgs = pydist.Uniform(0.5, 1.7).sample([n_items, latent_size]).mul(mask)
@@ -138,9 +144,10 @@ def simulate_loadings(n_indicators: int,
     return ldgs
 
 
-def simulate_graded_intercepts(n_items: int,
-                               all_same_n_cats: bool = True, 
-                              ):
+def simulate_categorical_intercepts(n_items: int,
+                                    all_same_n_cats: bool = True, 
+                                   ):
+    """Simulate intercepts for a categorical response model."""
     if all_same_n_cats:
         n_cats = [2] * n_items
     else:
@@ -151,7 +158,7 @@ def simulate_graded_intercepts(n_items: int,
     ints = []
     for n_cat in n_cats:
         if n_cat > 2:
-            cuts = torch.linspace(-3, 3, n_cat)
+            cuts = torch.linspace(-4, 4, n_cat)
             d = 4 / (n_cat - 1)
             tmp = (pydist.Uniform(-d, d).sample([1, n_cat - 1]) +
                    0.5 * (cuts[1:] + cuts[:-1])).flip(-1)
@@ -165,6 +172,7 @@ def simulate_graded_intercepts(n_items: int,
 def simulate_covariance_matrix(latent_size: int,
                                cov_type:    int,
                                ):
+    """Simulate a factor covariance matrix."""
     assert(cov_type in (0, 1, 2))
     if cov_type == 0:
         cov_mat = torch.eye(latent_size)
@@ -187,42 +195,34 @@ def simulate_and_save_data(model_type:      str,
                            data_dir:        str,
                            all_same_n_cats: bool = True,
                           ):
+    """Simulate and save parameters and data for several types of latent factor models."""
+    params = {}
     n_items = int(n_indicators * latent_size)
-    cov_mat = simulate_covariance_matrix(latent_size, cov_type)
+    params["cov_mat"] = simulate_covariance_matrix(latent_size, cov_type)
     
     if model_type in ("grm", "gpcm"):
-        ldgs = simulate_loadings(n_indicators, latent_size)
-        ints, n_cats = simulate_graded_intercepts(n_items, all_same_n_cats = all_same_n_cats)
-        ints_R = ints.numpy().astype(str)
-        ints_R[ints_R == "nan"] = "NA"
-        np.savetxt(os.path.join(expected_dir, "ints_R.csv"), ints_R, delimiter = ",", fmt = "%s")
-        np.savetxt(os.path.join(expected_dir, "n_cats.csv"), np.asarray(n_cats), delimiter = ",")
+        params["ldgs"] = simulate_loadings(n_indicators, latent_size)
+        ints_out = simulate_categorical_intercepts(n_items, all_same_n_cats = all_same_n_cats)
+        params["ints"], params["n_cats"] = ints_out[0], ints_out[1]
     else:
-        sim_kwargs = {}
         if model_type != "normal":
-            ldgs = simulate_loadings(n_indicators, latent_size).mul_(0.4)
-            ints = pydist.Uniform(0.1, 0.5).sample([n_items])
+            params["ldgs"] = simulate_loadings(n_indicators, latent_size).mul_(0.4)
+            params["ints"] = pydist.Uniform(0.1, 0.5).sample([n_items])
             if model_type == "negative_binomial":
-                sim_kwargs["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items])
+                params["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items])
             elif model_type == "lognormal":
-                sim_kwargs["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items])
+                params["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items])
         else:
-            ldgs = simulate_loadings(n_indicators, latent_size)
-            ints = torch.randn(n_items).mul(0.1)
-            sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items])
-        for k, v in sim_kwargs.items():
-            np.savetxt(os.path.join(expected_dir, k + ".csv"), v.numpy(), delimiter = ",")
-        
-    np.savetxt(os.path.join(expected_dir, "ldgs.csv"), ldgs.numpy(), delimiter = ",")
-    np.savetxt(os.path.join(expected_dir, "ints.csv"), ints.numpy(), delimiter = ",")
-    np.savetxt(os.path.join(expected_dir, "cov_mat.csv"), cov_mat.numpy(), delimiter = ",")
-    
+            params["ldgs"] = simulate_loadings(n_indicators, latent_size)
+            params["ints"] = torch.randn(n_items).mul(0.1)
+            params["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items])
+    for k, v in params.items():
+        np.savetxt(os.path.join(expected_dir, k + ".csv"), np.asarray(v), delimiter = ",")
+            
     if model_type in ("grm", "gpcm"):
         subprocess.call(["Rscript", "sim_mirt_data.R", model_type, str(sample_size), expected_dir, data_dir])
-        Y = torch.from_numpy(np.loadtxt(os.path.join(data_dir, "data.csv"), delimiter = ","))
     else:
+        sim_kwargs = {(k, v) for k, v in params.items() if k not in ("ldgs", "ints", "cov_mat")}
         Y = SIMULATORS[model_type](loadings = ldgs, intercepts = ints,
                                    cov_mat = cov_mat, **sim_kwargs).sample(sample_size)
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
-        
-    return Y

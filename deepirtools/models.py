@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
-from deepirtools.utils import *
+from deepirtools.utils import get_thresholds
 from typing import List, Optional
 from itertools import chain
 
@@ -116,7 +116,10 @@ class CategoricalBias(nn.Module):
     
     @property
     def bias(self):
-        return (self._bias * self.nan_mask)
+        bias = (self._bias * self.nan_mask)
+        if bias.shape[1] == 1:
+            return bias.squeeze()
+        return bias
 
     
 ################################################################################
@@ -145,7 +148,7 @@ class GradedBaseModel(nn.Module):
             Q           (Tensor):      Binary matrix indicating measurement structure.
             A           (Tensor):      Matrix imposing linear constraints on loadings.
             b           (Tensor):      Vector imposing linear constraints on loadings.
-            ints_mask   (Tensor):      Vector constraining specific intercepts to zero.
+            ints_mask   (Tensor):      Vector constraining first intercepts to zero.
         """
         super(GradedBaseModel, self).__init__()
         
@@ -291,8 +294,10 @@ class NonGradedBaseModel(nn.Module):
         self.Q = Q
         self.A = A
         
+        if ints_mask is not None:
+            assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
         self._bias = nn.Parameter(torch.empty(n_items))
-        self.ints_mask = ints_mask # assert binary
+        self.ints_mask = ints_mask
         
         self._reset_parameters()
         

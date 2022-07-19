@@ -2,11 +2,12 @@ import os
 from os.path import join
 import pytest
 import torch
+import numpy as np
 import deepirtools
 from deepirtools import IWAVE
-from deepirtools.utils import *
+from deepirtools.utils import invert_factors, invert_cov, match_columns
 from factor_analyzer import Rotator
-from sim_utils import *
+from sim_utils import simulate_and_save_data
 
 
 ABS_TOL = 0.1
@@ -21,6 +22,11 @@ if torch.cuda.is_available():
 
 sample_size = 10000
 n_indicators = 5
+
+
+def load_torch_from_csv(name: str):
+    t = np.loadtxt(os.path.join(expected_dir, name), delimiter = ",")
+    return torch.from_numpy(t)
 
 
 @pytest.mark.parametrize("model_type", ["grm", "gpcm", "poisson", "negative_binomial",
@@ -43,19 +49,23 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
     os.makedirs(expected_dir, exist_ok = True)
     os.makedirs(data_dir, exist_ok = True)
     
-    Y = simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
-                               expected_dir, data_dir, all_same_n_cats)
+    simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
+                           expected_dir, data_dir, all_same_n_cats)
+    exp_params = [load_torch_from_csv(k + ".csv") for k in ("ldgs", "ints", "cov_mat")]
+    exp_ldgs, exp_ints, exp_cov_mat = (torch.from_numpy(p) for p in exp_params)
+    Y = load_torch_from_csv("data.csv")
     
     n_items = Y.shape[1]
-    if model_type in ("grm", "gpcm"):
-        n_cats = np.loadtxt(os.path.join(expected_dir, "n_cats.csv"),
-                            delimiter = ",").astype(int).tolist()
-        iwave_kwargs = {"n_cats" : n_cats}
-    else:
-        iwave_kwargs = {"n_items" : n_items}
     lr = (0.1/(latent_size+1))*5**-1
-    if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
-        lr *= 1e-2
+    iwave_kwargs = {}
+    if model_type in ("grm", "gpcm"):
+        exp_ints *= -1
+        iwave_kwargs["n_cats"] = np.loadtxt(os.path.join(expected_dir, "n_cats.csv"),
+                                            delimiter = ",").astype(int).tolist()
+    else:
+        iwave_kwargs["n_items"] = n_items
+        if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
+            lr *= 1e-2
 
     model = IWAVE(learning_rate = lr,
                   device = device,
@@ -66,13 +76,6 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
                   **iwave_kwargs,
                   )
     model.fit(Y, batch_size = 128, iw_samples = 5)
-    
-    exp_params = (np.loadtxt(os.path.join(expected_dir, "ldgs.csv"), delimiter = ","),
-                  np.loadtxt(os.path.join(expected_dir, "ints.csv"), delimiter = ","),
-                  np.loadtxt(os.path.join(expected_dir, "cov_mat.csv"), delimiter = ","))
-    exp_ldgs, exp_ints, exp_cov_mat = (torch.from_numpy(p) for p in exp_params)
-    if model_type in ("grm", "gpcm"):
-        exp_ints = -exp_ints
     
     if latent_size > 1:
         if cov_type == 0:
@@ -86,13 +89,15 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         est_cov_mat = None
         exp_ldgs = exp_ldgs.unsqueeze(1)
     est_ints = model.intercepts
-    if model_type == "gpcm":
+    if model_type == "gpcm" and not all_same_n_cats:
         est_ints = est_ints.cumsum(dim = 1)
     
-    ldgs_err = invert_factors(match_columns(est_ldgs, exp_ldgs)).add(-exp_ldgs).abs()
+    ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
-    assert(ldgs_err.mean().le(ABS_TOL).all())
-    assert(ints_err.mean().le(ABS_TOL).all())
+    assert(ldgs_err.mean().le(ABS_TOL)), print(est_ldgs)
+    assert(ints_err.mean().le(ABS_TOL)), print(est_ints)
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).abs()
-        assert(cov_err.mean().le(ABS_TOL).all())
+        assert(cov_err.mean().le(ABS_TOL)), print(est_cov_mat)
+        
+#    model_type="grm"; latent_size=5; cov_type=1; device="cpu"; all_same_n_cats=False

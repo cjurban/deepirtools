@@ -5,7 +5,14 @@ import math
 import timeit
 from typing import List, Optional
 from deepirtools.base import BaseEstimator
-from deepirtools.models import *
+from deepirtools.models import (GradedResponseModel,
+                                GeneralizedPartialCreditModel,
+                                PoissonFactorModel,
+                                NegativeBinomialFactorModel,
+                                NormalFactorModel,
+                                LogNormalFactorModel,
+                                VariationalAutoencoder
+                               )
 from deepirtools.utils import tensor_dataset
 
 

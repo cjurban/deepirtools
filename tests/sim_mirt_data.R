@@ -18,7 +18,8 @@ expected_dir = args[3]
 data_dir = args[4]
 
 ldgs = read.csv(file.path(expected_dir, "ldgs.csv"), header = FALSE)
-ints = read.csv(file.path(expected_dir, "ints_R.csv"), header = FALSE)
+ints = read.csv(file.path(expected_dir, "ints.csv"), header = FALSE)
+ints[ints == "NaN"] = NA
 cov_mat = read.csv(file.path(expected_dir, "cov_mat.csv"), header = FALSE)
 
 if (model_type == "grm" & dim(ints)[2] > 1) {
