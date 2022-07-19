@@ -6,6 +6,7 @@ import pyro.distributions as pydist
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 import subprocess
+from deepirtools.utils import invert_factors
 
 
 class BaseFactorModelSimulator():
@@ -171,16 +172,17 @@ def simulate_categorical_intercepts(n_items: int,
 
 
 def simulate_covariance_matrix(latent_size: int,
-                               cov_type:    int,
+                               cov_type:    str,
                                ):
     """Simulate a factor covariance matrix."""
-    assert(cov_type in (0, 1, 2))
-    if cov_type == 0:
+    cov_types = ("fixed_variances_no_covariances", "fixed_variances", "free")
+    assert(cov_type in cov_types)
+    if cov_type == cov_types[0]:
         cov_mat = torch.eye(latent_size)
-    if cov_type == 1:
+    if cov_type == cov_types[1]:
         cov_mat = torch.ones([latent_size, latent_size]).mul(0.3)
         cov_mat.fill_diagonal_(1)
-    if cov_type == 2:
+    if cov_type == cov_types[2]:
         L = pydist.Uniform(-0.7, 0.7).sample([latent_size, latent_size]).tril()
         cov_mat = torch.mm(L, L.T)
         
@@ -190,7 +192,7 @@ def simulate_covariance_matrix(latent_size: int,
 def simulate_and_save_data(model_type:      str,
                            n_indicators:    int,
                            latent_size:     int,
-                           cov_type:        int,
+                           cov_type:        str,
                            sample_size:     int,
                            expected_dir:    str,
                            data_dir:        str,
@@ -227,6 +229,25 @@ def simulate_and_save_data(model_type:      str,
         Y = SIMULATORS[model_type](loadings = params["ldgs"], intercepts = params["ints"],
                                    cov_mat = params["cov_mat"], **sim_kwargs).sample(sample_size)
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
+        
+        
+def get_constraints(latent_size:     int,
+                    n_indicators:    int,
+                    constraint_type: str,
+                   ):
+    n_items = int(n_indicators * latent_size)
+    constraint_types = ("none", "binary", "linear")
+    assert(constraint_type in constraint_types)
+    Q = None; A = None; b = None
+    if constraint_type == "binary":
+        Q = torch.block_diag(*[torch.ones([n_items, 1])] * latent_size)
+    elif constraint_type == "linear":
+        constraints = ([torch.eye(n_indicators), torch.zeros([n_items, n_items])] * (latent_size - 1) +
+                       [torch.eye(n_indicators)])
+        A = torch.block_diag(*constraints)
+        b = torch.zeros(int(n_items * latent_size))
+    
+    return {"Q" : Q, "A" : A, "b" : b}
         
         
 def match_columns(inp_mat: torch.Tensor,

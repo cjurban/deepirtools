@@ -11,7 +11,7 @@ from deepirtools.models import (GradedResponseModel,
                                 NegativeBinomialFactorModel,
                                 NormalFactorModel,
                                 LogNormalFactorModel,
-                                VariationalAutoencoder
+                                VariationalAutoencoder,
                                )
 from deepirtools.utils import tensor_dataset
 
