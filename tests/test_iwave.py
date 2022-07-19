@@ -50,7 +50,14 @@ def _test_args():
 
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
                           "cov_type, all_same_n_cats, device"), _test_args())
-def test_param_recovery(idx, constraint_type, model_type, latent_size,cov_type, all_same_n_cats, device):
+def test_param_recovery(idx:             str,
+                        constraint_type: str,
+                        model_type:      str,
+                        latent_size:     int,
+                        cov_type:        str,
+                        all_same_n_cats: bool,
+                        device:          str,
+                       ):
     """Test parameter recovery for I-WAVE."""
     expected_dir = os.path.join(EXPECTED_DIR, "test_" + idx)
     data_dir = os.path.join(DATA_DIR,  "test_" + idx)
@@ -93,9 +100,9 @@ def test_param_recovery(idx, constraint_type, model_type, latent_size,cov_type, 
     model.fit(Y, batch_size = 128, iw_samples = 5)
     
     if latent_size > 1 and constraint_type == "none":
-        if cov_type == 0:
+        if cov_type == "fixed_variances_no_covariances":
             rotator = Rotator(method = "varimax")
-        elif cov_type == 1:
+        elif cov_type == "fixed_variances":
             rotator = Rotator(method = "geomin_obl")
         est_ldgs = torch.from_numpy(rotator.fit_transform(model.loadings.numpy()))
         est_cov_mat = (torch.from_numpy(rotator.phi_) if cov_type == 1 else None)
