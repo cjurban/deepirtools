@@ -475,6 +475,8 @@ class Spherical(nn.Module):
             correlated_factors (List of int): Which variables should be correlated.
         """
         super(Spherical, self).__init__()
+        assert(max(correlated_factors) <= size - 1), ("correlated_factors may include no values ",
+                                                      "larger than {}.".format(size - 1))
         self.size = size
         self.fixed_variances = fixed_variances
         self.correlated_factors = correlated_factors
@@ -493,14 +495,16 @@ class Spherical(nn.Module):
     def cart2spher(self, cart_mat):
         n = cart_mat.size(1)
         spher_mat = torch.zeros_like(cart_mat)
-        cos_mat = cart_mat[:, 1:n].cos()
-        sin_mat = cart_mat[:, 1:n].sin().cumprod(1)
-
-        spher_mat[:, 0] = cart_mat[:, 0] * cos_mat[:, 0]
-        spher_mat[:, 1:(n - 1)] = cart_mat[:, 0].unsqueeze(1) * sin_mat[:, 0:(n - 2)] * cos_mat[:, 1:(n - 1)]
-        spher_mat[:, -1] = cart_mat[:, 0] * sin_mat[:, -1]
-
-        return spher_mat
+        
+        if n > 1:
+            cos_mat = cart_mat[:, 1:n].cos()
+            sin_mat = cart_mat[:, 1:n].sin().cumprod(1)
+            spher_mat[:, 0] = cart_mat[:, 0] * cos_mat[:, 0]
+            spher_mat[:, 1:(n - 1)] = cart_mat[:, 0].unsqueeze(1) * sin_mat[:, 0:(n - 2)] * cos_mat[:, 1:(n - 1)]
+            spher_mat[:, -1] = cart_mat[:, 0] * sin_mat[:, -1]
+            return spher_mat
+        else:
+            return cart_mat
         
     @property
     def weight(self):

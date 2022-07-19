@@ -36,14 +36,13 @@ def _test_args():
     prods = enumerated_product(["none", "binary", "linear"],
                                ["grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal"],
                                [1, 5],
-                               ["fixed_variances_no_covariances", "fixed_variances", "free"],
+                               ["fixed_variances_no_covariances", "fixed_variances"],
                                [True, False],
                                devices
                               )
     return [["_".join((str(i) for i in idx))] + [p for p in prod] for
             idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
-                                       (prod[1] not in ("grm", "gpcm") and not prod[4]) or
-                                       (prod[0] == "none" and "fixed_variances" not in prod[3])
+                                       (prod[1] not in ("grm", "gpcm") and not prod[4])
                                       )
            ]
 

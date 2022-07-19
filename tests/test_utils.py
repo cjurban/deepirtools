@@ -171,22 +171,37 @@ def simulate_categorical_intercepts(n_items: int,
     return torch.cat(ints, dim = 0), n_cats
 
 
-def simulate_covariance_matrix(latent_size: int,
-                               cov_type:    str,
-                               ):
-    """Simulate a factor covariance matrix."""
-    cov_types = ("fixed_variances_no_covariances", "fixed_variances", "free")
+def get_covariance_matrix(latent_size: int,
+                          cov_type:    str,
+                         ):
+    cov_types = ("fixed_variances_no_covariances", "fixed_variances")
     assert(cov_type in cov_types)
     if cov_type == cov_types[0]:
         cov_mat = torch.eye(latent_size)
     if cov_type == cov_types[1]:
         cov_mat = torch.ones([latent_size, latent_size]).mul(0.3)
         cov_mat.fill_diagonal_(1)
-    if cov_type == cov_types[2]:
-        L = pydist.Uniform(-0.7, 0.7).sample([latent_size, latent_size]).tril()
-        cov_mat = torch.mm(L, L.T)
         
     return cov_mat
+
+
+def get_constraints(latent_size:     int,
+                    n_indicators:    int,
+                    constraint_type: str,
+                   ):
+    n_items = int(n_indicators * latent_size)
+    constraint_types = ("none", "binary", "linear")
+    assert(constraint_type in constraint_types)
+    Q = None; A = None; b = None
+    if constraint_type == "binary":
+        Q = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
+    elif constraint_type == "linear":
+        constraints = ([torch.eye(n_indicators), torch.zeros([n_items, n_items])] * (latent_size - 1) +
+                       [torch.eye(n_indicators)])
+        A = torch.block_diag(*constraints)
+        b = torch.zeros(int(n_items * latent_size))
+    
+    return {"Q" : Q, "A" : A, "b" : b}
 
 
 def simulate_and_save_data(model_type:      str,
@@ -201,7 +216,7 @@ def simulate_and_save_data(model_type:      str,
     """Simulate and save parameters and data for several types of latent factor models."""
     params = {}
     n_items = int(n_indicators * latent_size)
-    params["cov_mat"] = simulate_covariance_matrix(latent_size, cov_type)
+    params["cov_mat"] = get_covariance_matrix(latent_size, cov_type)
     
     if model_type in ("grm", "gpcm"):
         params["ldgs"] = simulate_loadings(n_indicators, latent_size)
@@ -229,25 +244,6 @@ def simulate_and_save_data(model_type:      str,
         Y = SIMULATORS[model_type](loadings = params["ldgs"], intercepts = params["ints"],
                                    cov_mat = params["cov_mat"], **sim_kwargs).sample(sample_size)
         np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
-        
-        
-def get_constraints(latent_size:     int,
-                    n_indicators:    int,
-                    constraint_type: str,
-                   ):
-    n_items = int(n_indicators * latent_size)
-    constraint_types = ("none", "binary", "linear")
-    assert(constraint_type in constraint_types)
-    Q = None; A = None; b = None
-    if constraint_type == "binary":
-        Q = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
-    elif constraint_type == "linear":
-        constraints = ([torch.eye(n_indicators), torch.zeros([n_items, n_items])] * (latent_size - 1) +
-                       [torch.eye(n_indicators)])
-        A = torch.block_diag(*constraints)
-        b = torch.zeros(int(n_items * latent_size))
-    
-    return {"Q" : Q, "A" : A, "b" : b}
         
         
 def match_columns(inp_mat: torch.Tensor,
