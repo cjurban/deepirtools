@@ -158,8 +158,8 @@ def simulate_categorical_intercepts(n_items: int,
     ints = []
     for n_cat in n_cats:
         if n_cat > 2:
-            cuts = torch.linspace(-4, 4, n_cat)
-            d = 4 / (n_cat - 1)
+            cuts = torch.linspace(-3, 3, n_cat)
+            d = 3 / (n_cat - 1)
             tmp = (pydist.Uniform(-d, d).sample([1, n_cat - 1]) +
                    0.5 * (cuts[1:] + cuts[:-1])).flip(-1)
         else:
