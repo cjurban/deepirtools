@@ -24,8 +24,8 @@ sample_size = 10000
 n_indicators = 5
 
 
-def load_torch_from_csv(name: str):
-    t = np.loadtxt(os.path.join(expected_dir, name), delimiter = ",")
+def load_torch_from_csv(name, top_dir):
+    t = np.loadtxt(os.path.join(top_dir, name), delimiter = ",")
     return torch.from_numpy(t)
 
 
@@ -51,9 +51,9 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
     
     simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
                            expected_dir, data_dir, all_same_n_cats)
-    exp_params = [load_torch_from_csv(k + ".csv") for k in ("ldgs", "ints", "cov_mat")]
+    exp_params = [load_torch_from_csv(k + ".csv", expected_dir) for k in ("ldgs", "ints", "cov_mat")]
     exp_ldgs, exp_ints, exp_cov_mat = (torch.from_numpy(p) for p in exp_params)
-    Y = load_torch_from_csv("data.csv")
+    Y = load_torch_from_csv("data.csv", expected_dir)
     
     n_items = Y.shape[1]
     lr = (0.1/(latent_size+1))*5**-1
@@ -99,5 +99,3 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).abs()
         assert(cov_err.mean().le(ABS_TOL)), print(est_cov_mat)
-        
-#    model_type="grm"; latent_size=5; cov_type=1; device="cpu"; all_same_n_cats=False
