@@ -6,4 +6,4 @@ from .utils import (manual_seed,
                     normalize_ints)
 from .figures import screeplot, loadings_heatmap
 
-__version__ = "1.1.20"
+__version__ = "1.1.21"

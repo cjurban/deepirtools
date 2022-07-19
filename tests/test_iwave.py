@@ -7,7 +7,7 @@ import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import invert_factors, invert_cov, match_columns
 from factor_analyzer import Rotator
-from sim_utils import simulate_and_save_data
+from test_utils import simulate_and_save_data, match_columns, load_torch_from_csv
 
 
 ABS_TOL = 0.1
@@ -22,11 +22,6 @@ if torch.cuda.is_available():
 
 sample_size = 10000
 n_indicators = 5
-
-
-def load_torch_from_csv(name, top_dir):
-    t = np.loadtxt(os.path.join(top_dir, name), delimiter = ",")
-    return torch.from_numpy(t)
 
 
 @pytest.mark.parametrize("model_type", ["grm", "gpcm", "poisson", "negative_binomial",

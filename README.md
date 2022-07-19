@@ -31,7 +31,6 @@ All models are estimable in both confirmatory and exploratory contexts. In the c
 -  ``torch``
 -  ``pyro-ppl``
 -  ``numpy``
--  ``scipy``
 
 ## Installation
 
