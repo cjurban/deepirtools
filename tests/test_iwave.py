@@ -43,9 +43,11 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         return
     
     expected_dir = os.path.join(EXPECTED_DIR, "exploratory", "model_type_{}".format(model_type),
-                                "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
+                                "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size),
+                                "device_{}".format(device), "all_same_n_cats_{}".format(all_same_n_cats * 1))
     data_dir = os.path.join(DATA_DIR, "exploratory", "model_type_{}".format(model_type),
-                            "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size))
+                            "cov_type_{}".format(cov_type), "latent_size_{}".format(latent_size),
+                            "device_{}".format(device), "all_same_n_cats_{}".format(all_same_n_cats * 1))
     os.makedirs(expected_dir, exist_ok = True)
     os.makedirs(data_dir, exist_ok = True)
     
@@ -89,8 +91,9 @@ def test_exploratory_iwave(model_type, latent_size, cov_type, device, all_same_n
         est_cov_mat = None
         exp_ldgs = exp_ldgs.unsqueeze(1)
     est_ints = model.intercepts
-    if model_type == "gpcm" and not all_same_n_cats:
-        est_ints = est_ints.cumsum(dim = 1)
+    if model_type == "gpcm" and len(exp_ints.shape) > 1:
+        if exp_ints.shape[1] > 1:
+            est_ints = est_ints.cumsum(dim = 1)
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()

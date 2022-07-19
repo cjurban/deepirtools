@@ -149,7 +149,7 @@ def simulate_categorical_intercepts(n_items: int,
                                    ):
     """Simulate intercepts for a categorical response model."""
     if all_same_n_cats:
-        n_cats = [2] * n_items
+        n_cats = [3] * n_items
     else:
         cats = [2, 3, 4, 5, 6]
         assert(n_items >= len(cats))
