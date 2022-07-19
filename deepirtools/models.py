@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
+import numpy as np
 from deepirtools.utils import get_thresholds
 from typing import List, Optional
 from itertools import chain

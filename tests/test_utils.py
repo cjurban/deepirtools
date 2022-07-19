@@ -240,7 +240,7 @@ def get_constraints(latent_size:     int,
     assert(constraint_type in constraint_types)
     Q = None; A = None; b = None
     if constraint_type == "binary":
-        Q = torch.block_diag(*[torch.ones([n_items, 1])] * latent_size)
+        Q = torch.block_diag(*[torch.ones([n_indicators, 1])] * latent_size)
     elif constraint_type == "linear":
         constraints = ([torch.eye(n_indicators), torch.zeros([n_items, n_items])] * (latent_size - 1) +
                        [torch.eye(n_indicators)])
