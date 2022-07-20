@@ -62,14 +62,23 @@ class IWAVE(BaseEstimator):
         self.grad_estimator = gradient_estimator
         self.runtime_kwargs["grad_estimator"] = gradient_estimator
         
-        self.timerecords = {}
-        
         model_types = {k for k, _ in MODEL_TYPES.items()}
         assert(model_type in model_types), "model_type must be one of {}".format(model_types)
         decoder = MODEL_TYPES[model_type]
+        
+        if verbose:
+            print("\nInitializing model parameters", end = "\n")
+        start = timeit.default_timer()
         self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
+        stop = timeit.default_timer()
+        if verbose:
+            print("\nInitialization ended in ", round(stop - start, 2), " seconds", end = "\n")
+        
         self.optimizer = Adam([{"params" : self.model.parameters()}],
                                 lr = learning_rate, amsgrad = True)
+        
+        self.timerecords = {}
+        self.timerecords["init"] = stop - start
                         
     def loss_function(self,
                       elbo: torch.Tensor,
