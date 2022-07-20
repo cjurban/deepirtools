@@ -9,6 +9,7 @@ from pyro.nn import DenseNN
 from deepirtools.utils import get_thresholds
 from typing import List, Optional
 import itertools
+import inspect
 
 
 EPS = 1e-7
@@ -553,7 +554,7 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.theta.device)
         
         
-def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=5.):
+def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=3.):
     """Modification of Pyro's spline_coupling() to use ELU activations."""
     if split_dim is None:
         split_dim = input_dim // 2
@@ -593,7 +594,7 @@ class VariationalAutoencoder(nn.Module):
                  fixed_variances:       bool = True,
                  correlated_factors:    List[int] = [],
                  use_spline_prior:      bool = False,
-                 **decoder_kwargs,
+                 **kwargs,
                 ):
         """
         Variational autoencoder with an interchangeable measurement model (i.e., decoder).
@@ -608,7 +609,7 @@ class VariationalAutoencoder(nn.Module):
             fixed_variances     (bool):        Whether to constrain latent variances to one.
             correlated_factors  (List of int): Which latent variables should be correlated.
             use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
-            decoder_kwargs      (dict):        Named parameters passed to decoder.__init__().
+            kwargs              (dict):        Named parameters passed to decoder.__init__() and spline_coupling().
         """
         super(VariationalAutoencoder, self).__init__()
         
@@ -616,18 +617,21 @@ class VariationalAutoencoder(nn.Module):
         self.inf_net = DenseNN(input_size, inference_net_sizes, [int(2 * latent_size)], nonlinearity = nn.ELU())
                 
         # Measurement model.
+        decoder_args = list(inspect.signature(decoder).parameters)
+        decoder_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in decoder_args}
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
         # Latent prior.
         assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
                                                                       "with spline/spline coupling prior.")
+        spline_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in ["count_bins", "bound"]}
         if use_spline_prior:
             if latent_size == 1:
-                self.flow = T.Spline(1, count_bins=16, bound=5.)
+                self.flow = T.Spline(1, **spline_kwargs)
             else:
-                self.flow1 = T.spline_coupling(latent_size)
+                self.flow1 = T.spline_coupling(latent_size, **spline_kwargs)
                 self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
-                self.flow3 = T.spline_coupling(latent_size)
+                self.flow3 = T.spline_coupling(latent_size, **spline_kwargs)
         else:
             self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors)
         self.latent_size = latent_size
