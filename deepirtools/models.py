@@ -625,6 +625,7 @@ class VariationalAutoencoder(nn.Module):
         assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
                                                                       "with spline/spline coupling prior.")
         spline_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in ["count_bins", "bound"]}
+        assert(len(kwargs) == 0), "Unused arguments: " + ", ".join([k for k in kwargs])
         if use_spline_prior:
             if latent_size == 1:
                 self.flow = T.Spline(1, **spline_kwargs)
