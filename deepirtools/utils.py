@@ -47,8 +47,6 @@ class ConvergenceChecker():
                   "Cur. loss = {:7.2f}".format(loss),
                   "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
                   end = "")
-        if self.converged:
-            print("\n")
 
 
 def get_thresholds(rng, n_cat):

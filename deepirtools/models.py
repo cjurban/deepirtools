@@ -644,7 +644,7 @@ class VariationalAutoencoder(nn.Module):
         if self.use_spline_prior:
             device = self.inf_net.layers[0].weight.device
             params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
-            optimizer = Adam([{"params" : itertools.chain(params)}], lr = 1e-3, amsgrad = True)
+            optimizer = Adam([{"params" : itertools.chain(*params)}], lr = 1e-3, amsgrad = True)
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
@@ -714,7 +714,7 @@ class VariationalAutoencoder(nn.Module):
             flow = self.__get_flow()
             if self.fixed_variances:
                 x_mean, x_dispersion = x.mean(dim = -2, keepdim = True).detach(), x.std(dim = -2, keepdim = True).pow(-1).detach()
-                flows.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
+                flow.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
             px = pydist.TransformedDistribution(base_dist, flow)
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
