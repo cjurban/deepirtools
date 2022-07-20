@@ -67,7 +67,7 @@ class IWAVE(BaseEstimator):
         decoder = MODEL_TYPES[model_type]
         
         if verbose:
-            print("\nInitializing model parameters", end = "\n")
+            print("\nInitializing model parameters", end = "")
         start = timeit.default_timer()
         self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
         stop = timeit.default_timer()

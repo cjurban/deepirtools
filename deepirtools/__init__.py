@@ -7,4 +7,4 @@ from .utils import (manual_seed,
                    )
 from .figures import screeplot, loadings_heatmap
 
-__version__ = "1.1.25"
+__version__ = "1.1.27"

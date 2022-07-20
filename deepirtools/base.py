@@ -146,7 +146,7 @@ class BaseEstimator():
         stop = timeit.default_timer()
         self.timerecords["fit"] = stop - start
         if self.verbose:
-            print("\nFitting ended in ", round(stop - start, 2), " seconds", end = "\n")
+            print("Fitting ended in ", round(stop - start, 2), " seconds", end = "\n")
         
     def save_model(self,
                    model_name: str,
