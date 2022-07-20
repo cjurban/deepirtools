@@ -554,7 +554,7 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.theta.device)
         
         
-def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=3.):
+def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, bound=3.):
     """Modification of Pyro's spline_coupling() to use ELU activations."""
     if split_dim is None:
         split_dim = input_dim // 2
@@ -653,9 +653,9 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
-            for _ in range(1000):
+            for _ in range(5000):
                 self.zero_grad()
-                x = torch.randn([100, self.latent_size], device = device)
+                x = torch.randn([32, self.latent_size], device = device)
                 loss = -px.log_prob(x).mean()
                 loss.backward()
                 optimizer.step()
