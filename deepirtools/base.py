@@ -124,7 +124,8 @@ class BaseEstimator():
                                    fitting should be terminated if convergence not achieved.
             model_kwargs (dict):   Named parameters passed to self.model.forward().
         """
-        print("\nFitting started", end = "\n")
+        if self.verbose:
+            print("\nFitting started", end = "\n")
         start = timeit.default_timer()
 
         train_loader =  torch.utils.data.DataLoader(
@@ -144,7 +145,8 @@ class BaseEstimator():
                 
         stop = timeit.default_timer()
         self.timerecords["fit"] = stop - start
-        print("\nFitting ended in ", round(stop - start, 2), " seconds", end = "\n")
+        if self.verbose:
+            print("\nFitting ended in ", round(stop - start, 2), " seconds", end = "\n")
         
     def save_model(self,
                    model_name: str,

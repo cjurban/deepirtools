@@ -114,8 +114,8 @@ def test_param_recovery(idx:             str,
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
-    assert(ldgs_err.mean().le(ABS_TOL)), print(est_ldgs)
+    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(est_ldgs)
     assert(ints_err.mean().le(ABS_TOL)), print(est_ints)
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).abs()
-        assert(cov_err.mean().le(ABS_TOL)), print(est_cov_mat)
+        assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(est_cov_mat)

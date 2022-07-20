@@ -60,8 +60,9 @@ class IWAVE(BaseEstimator):
         super().__init__(device, log_interval, verbose)
         assert(gradient_estimator in GRAD_ESTIMATORS), "gradient_estimator must be one of {}".format(GRAD_ESTIMATORS)
         self.grad_estimator = gradient_estimator
+        self.runtime_kwargs["grad_estimator"] = gradient_estimator
         
-        self.runtime_kwargs["grad_estimator"] = self.grad_estimator
+        self.timerecords = {}
         
         model_types = {k for k, _ in MODEL_TYPES.items()}
         assert(model_type in model_types), "model_type must be one of {}".format(model_types)
@@ -69,7 +70,6 @@ class IWAVE(BaseEstimator):
         self.model = VariationalAutoencoder(decoder=decoder, **model_kwargs).to(device)
         self.optimizer = Adam([{"params" : self.model.parameters()}],
                                 lr = learning_rate, amsgrad = True)
-        self.timerecords = {}
                         
     def loss_function(self,
                       elbo: torch.Tensor,
@@ -125,13 +125,16 @@ class IWAVE(BaseEstimator):
         old_estimator = self.grad_estimator
         self.grad_estimator = "iwae"
         
-        print("\nComputing approx. LL", end="")
+        if self.verbose:
+            print("\nComputing approx. LL", end="")
         
         start = timeit.default_timer()
         ll = -self.test(loader, mc_samples = mc_samples, iw_samples = iw_samples)
         stop = timeit.default_timer()
         self.timerecords["log_likelihood"] = stop - start
-        print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
+        
+        if self.verbose:
+            print("\nApprox. LL computed in", round(stop - start, 2), "seconds\n", end = "")
         
         self.grad_estimator = old_estimator
 

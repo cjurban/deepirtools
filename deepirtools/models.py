@@ -2,12 +2,13 @@ import math
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.optim import Adam
 import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
 from deepirtools.utils import get_thresholds
 from typing import List, Optional
-from itertools import chain
+import itertools
 
 
 EPS = 1e-7
@@ -475,8 +476,9 @@ class Spherical(nn.Module):
             correlated_factors (List of int): Which variables should be correlated.
         """
         super(Spherical, self).__init__()
-        assert(max(correlated_factors) <= size - 1), ("correlated_factors may include no values ",
-                                                      "larger than {}.".format(size - 1))
+        if correlated_factors != []:
+            assert(max(correlated_factors) <= size - 1), ("correlated_factors may include no values ",
+                                                          "larger than {}.".format(size - 1))
         self.size = size
         self.fixed_variances = fixed_variances
         self.correlated_factors = correlated_factors
@@ -617,7 +619,8 @@ class VariationalAutoencoder(nn.Module):
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
         # Latent prior.
-        assert(not ((not fixed_variances or correlated_factors != []) and use_spline_prior)), ""
+        assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
+                                                                      "with spline/spline coupling prior.")
         if use_spline_prior:
             if latent_size == 1:
                 self.flow = T.Spline(1, count_bins=16, bound=5.)
@@ -637,6 +640,29 @@ class VariationalAutoencoder(nn.Module):
         nn.init.normal_(self.inf_net.layers[-1].weight, mean=0., std=0.001)
         nn.init.normal_(self.inf_net.layers[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net.layers[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
+        
+        if self.use_spline_prior:
+            device = self.inf_net.layers[0].weight.device
+            params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
+            optimizer = Adam([{"params" : itertools.chain(params)}], lr = 1e-3, amsgrad = True)
+            base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
+                                      torch.ones([1, self.latent_size], device = device))
+            px = pydist.TransformedDistribution(base_dist, self.__get_flow())
+            for _ in range(1000):
+                self.zero_grad()
+                x = torch.randn([100, self.latent_size], device = device)
+                loss = -px.log_prob(x).mean()
+                loss.backward()
+                optimizer.step()
+                px.clear_cache()
+        
+    def __get_flow(self):
+        if self.use_spline_prior:
+            if self.latent_size == 1:
+                return [self.flow]
+            else:
+                return [self.flow1, self.flow2, self.flow3]
+        return None
 
     def encode(self,
                y:          torch.Tensor,
@@ -685,14 +711,11 @@ class VariationalAutoencoder(nn.Module):
         # Log p(x).
         if self.use_spline_prior:
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
-            if self.latent_size == 1:
-                flows = [self.flow]
-            else:
-                flows = [self.flow1, self.flow2, self.flow3]
+            flow = self.__get_flow()
             if self.fixed_variances:
                 x_mean, x_dispersion = x.mean(dim = -2, keepdim = True).detach(), x.std(dim = -2, keepdim = True).pow(-1).detach()
                 flows.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
-            px = pydist.TransformedDistribution(base_dist, flows)
+            px = pydist.TransformedDistribution(base_dist, flow)
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
             if self.cholesky.correlated_factors != []:
