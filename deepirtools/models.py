@@ -718,7 +718,8 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
             flow = self.__get_flow()
             if self.fixed_variances:
-                x_mean, x_dispersion = x.mean(dim = -2, keepdim = True).detach(), x.std(dim = -2, keepdim = True).pow(-1).detach()
+                x_mean = x.mean(dim = -2, keepdim = True)
+                x_dispersion = x.var(dim = -2, keepdim = True).add(EPS).sqrt().pow(-1)
                 flow.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
             px = pydist.TransformedDistribution(base_dist, flow)
             log_px = px.log_prob(x).unsqueeze(-1)
