@@ -10,6 +10,7 @@ from deepirtools.utils import get_thresholds
 from typing import List, Optional
 import itertools
 import inspect
+import logging
 
 
 EPS = 1e-7
@@ -593,6 +594,7 @@ class VariationalAutoencoder(nn.Module):
                  latent_size:           int,
                  fixed_variances:       bool = True,
                  correlated_factors:    List[int] = [],
+                 covariate_size:        int = 0,
                  use_spline_prior:      bool = False,
                  **kwargs,
                 ):
@@ -608,20 +610,30 @@ class VariationalAutoencoder(nn.Module):
             latent_size         (int):         Number of latent variables.
             fixed_variances     (bool):        Whether to constrain latent variances to one.
             correlated_factors  (List of int): Which latent variables should be correlated.
+            covariate_size      (int):         Number of covariates for latent regression.
             use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
-            kwargs              (dict):        Named parameters passed to decoder.__init__() and spline_coupling().
+            kwargs              (dict):        Named parameters passed to decoder.__init__() and
+                                               rational linear spline parameters passed to spline_coupling().
         """
         super(VariationalAutoencoder, self).__init__()
         
         # Inference model neural network.
-        self.inf_net = DenseNN(input_size, inference_net_sizes, [int(2 * latent_size)], nonlinearity = nn.ELU())
+        self.inf_net = DenseNN(input_size + covariate_size, inference_net_sizes,
+                               [int(2 * latent_size)], nonlinearity = nn.ELU())
                 
         # Measurement model.
         decoder_args = list(inspect.signature(decoder).parameters)
         decoder_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in decoder_args}
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
         
+        # Latent regression.
+        if covariate_size > 0:
+            self.lreg_weight = nn.Parameter(torch.empty([latent_size, covariate_size]))
+        self.cov_size = covariate_size
+        
         # Latent prior.
+        assert(not (covariate_size > 0 and use_spline_prior)), ("Latent regression not supported with ",
+                                                                "spline/spline coupling prior.")
         assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
                                                                       "with spline/spline coupling prior.")
         spline_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in ["count_bins", "bound"]}
@@ -646,6 +658,9 @@ class VariationalAutoencoder(nn.Module):
         nn.init.normal_(self.inf_net.layers[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net.layers[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
         
+        if self.cov_size > 0:
+            nn.init.normal_(self.lreg_weight, mean=0., std=0.001)
+        
         if self.use_spline_prior:
             device = self.inf_net.layers[0].weight.device
             params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
@@ -653,9 +668,9 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
-            for _ in range(5000):
+            for _ in range(1000):
                 self.zero_grad()
-                x = torch.randn([32, self.latent_size], device = device)
+                x = torch.randn([128, self.latent_size], device = device)
                 loss = -px.log_prob(x).mean()
                 loss.backward()
                 optimizer.step()
@@ -692,6 +707,7 @@ class VariationalAutoencoder(nn.Module):
                 y:              torch.Tensor,
                 grad_estimator: str,
                 mask:           Optional[torch.Tensor] = None,
+                covariates:     Optional[torch.Tensor] = None,
                 mc_samples:     int = 1,
                 iw_samples:     int = 1,
                ):
@@ -704,16 +720,25 @@ class VariationalAutoencoder(nn.Module):
                                          "dreg" = doubly reparameterized gradient estimator
                                          "iwae" = standard gradient estimator
             mask           (Tensor): Binary mask indicating missing item responses.
+            covariates     (Tensor): Matrix of covariates.
             mc_samples     (int):    Number of Monte Carlo samples.
             iw_samples     (int):    Number of importance-weighted samples.
         """
-        mu, std = self.encode(y, mc_samples, iw_samples)
+        if self.cov_size > 0:
+            try:
+                _y = torch.cat((y, covariates), dim = 1)
+            except TypeError:
+                if covariates is None:
+                    logging.exception("Covariates must be passed to fit() when covariate_size > 0.")
+        else:
+            _y = y
+        mu, std = self.encode(_y, mc_samples, iw_samples)
         x = mu + std * torch.randn_like(mu)
         
-        # Log p(y | x).
+        # Log p(y | x, covariates).
         log_py_x = self.decoder(x, y, mask)
         
-        # Log p(x).
+        # Log p(x | covariates).
         if self.use_spline_prior:
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
             flow = self.__get_flow()
@@ -724,14 +749,16 @@ class VariationalAutoencoder(nn.Module):
             px = pydist.TransformedDistribution(base_dist, flow)
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
-            if self.cholesky.correlated_factors != []:
-                log_px = pydist.MultivariateNormal(torch.zeros_like(x, device = x.device),
-                                                   scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+            if self.cov_size > 0:
+                loc = F.linear(covariates, self.lreg_weight)
             else:
-                log_px = pydist.Normal(torch.zeros_like(x, device = x.device),
-                                       torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
+                loc = torch.zeros_like(x, device = x.device)
+            if self.cholesky.correlated_factors != []:
+                log_px = pydist.MultivariateNormal(loc, scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
+            else:
+                log_px = pydist.Normal(loc, torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
             
-        # Log q(x | y).
+        # Log q(x | y, covariates).
         if iw_samples > 1 and grad_estimator == "dreg":
             qx_y = pydist.Normal(mu.detach(), std.detach())
         else:

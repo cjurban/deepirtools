@@ -74,7 +74,8 @@ def screeplot(latent_sizes:             List[int],
                       latent_size = latent_size,
                       **model_kwargs,
                      )
-        model.fit(data_train, batch_size, mask_train, max_epochs, iw_samples = iw_samples_fit)
+        model.fit(data_train, batch_size = batch_size, missing_mask = mask_train,
+                  max_epochs = max_epochs, iw_samples = iw_samples_fit)
 
         ll = model.log_likelihood(data_test, missing_mask=mask_test, iw_samples = iw_samples_ll)
         ll_list.append(ll)

@@ -49,13 +49,8 @@ class BaseEstimator():
         if self.model.training:
             self.optimizer.zero_grad()
             
-        if isinstance(batch, list):
-            batch, mask = batch[0], batch[1]
-            mask = mask.to(self.device).float()
-        else:
-            mask = None
-        batch =  batch.to(self.device).float()
-        output = self.model(batch, mask=mask, **model_kwargs, **self.runtime_kwargs)
+        batch = {k : v.to(self.device).float() if v is not None else v for k, v in batch.items()}
+        output = self.model(**batch, **model_kwargs, **self.runtime_kwargs)
         loss = self.loss_function(*output)
 
         if self.model.training and not torch.isnan(loss):
@@ -110,6 +105,7 @@ class BaseEstimator():
             data:           torch.Tensor,
             batch_size:     int = 32,
             missing_mask:   Optional[torch.Tensor] = None,
+            covariates:     Optional[torch.Tensor] = None,
             max_epochs:     int = 100000,
             **model_kwargs,
            ):
@@ -120,6 +116,7 @@ class BaseEstimator():
             data         (Tensor): Data set containing item responses.
             batch_size   (int):    Mini-batch size for stochastic gradient optimizer.
             missing_mask (Tensor): Binary mask indicating missing item responses.
+            covariates   (Tensor): Matrix of covariates.
             max_epochs   (int):    Number of passes through the full data set after which
                                    fitting should be terminated if convergence not achieved.
             model_kwargs (dict):   Named parameters passed to self.model.forward().
@@ -129,7 +126,8 @@ class BaseEstimator():
         start = timeit.default_timer()
 
         train_loader =  torch.utils.data.DataLoader(
-                            tensor_dataset(data=data, mask=missing_mask),
+                            tensor_dataset(data=data, mask=missing_mask,
+                                           covariates = covariates),
                             batch_size = batch_size, shuffle = True,
                             pin_memory = self.device == "cuda",
                         )

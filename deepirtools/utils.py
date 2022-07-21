@@ -134,16 +134,20 @@ class tensor_dataset(Dataset):
     def __init__(self,
                  data,
                  mask = None,
+                 covariates = None,
                 ):
         self.data = data
         self.mask = mask
+        self.covariates = covariates
     
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        d_samp = self.data[idx]
+        batch = {}
+        batch["y"] = self.data[idx]
         if self.mask is not None:
-            mask_samp = self.mask[idx]
-            return d_samp, mask_samp
-        return d_samp
+            batch["mask"] = self.mask[idx]
+        if self.covariates is not None:
+            batch["covariates"] = self.covariates[idx]
+        return batch

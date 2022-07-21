@@ -121,12 +121,14 @@ class IWAVE(BaseEstimator):
     def log_likelihood(self,
                        data:         torch.Tensor,
                        missing_mask: Optional[torch.Tensor] = None,
+                       covariates:   Optional[torch.Tensor] = None,
                        mc_samples:   int = 1,
                        iw_samples:   int = 5000,
                       ):
         """Log-likelihood for a data set."""
         loader =  torch.utils.data.DataLoader(
-                    tensor_dataset(data = data, mask = missing_mask),
+                    tensor_dataset(data = data, mask = missing_mask,
+                                   covariates = covariates),
                     batch_size = 32, shuffle = True,
                     pin_memory = self.device == "cuda",
                   )
@@ -153,28 +155,24 @@ class IWAVE(BaseEstimator):
     def scores(self,
                data:         torch.Tensor,
                missing_mask: Optional[torch.Tensor] = None,
+               covariates:   Optional[torch.Tensor] = None,
                mc_samples:   int = 1,
                iw_samples:   int = 5000,
               ):
         
         loader = torch.utils.data.DataLoader(
-                    tensor_dataset(data = data, mask = missing_mask),
+                    tensor_dataset(data = data, mask = missing_mask,
+                                   covariates = covariates),
                     batch_size = 32, shuffle = True,
                     pin_memory = self.device == "cuda",
                   )
         
         scores = []
         for batch in loader:
-            if isinstance(batch, list):
-                batch, mask = batch[0], batch[1]
-                mask = mask.to(self.device).float()
-            else:
-                mask = None
-            batch =  batch.to(self.device).float()
-            batch_size = batch.size(0)
+            batch = {k : v.to(self.device).float() if v is not None else v for k, v in batch.items()}
             
-            elbo, x = self.model(batch, mask = mask, mc_samples = mc_samples,
-                                 iw_samples = iw_samples, **self.runtime_kwargs)
+            elbo, x = self.model(**batch, mc_samples = mc_samples, iw_samples = iw_samples,
+                                 **self.runtime_kwargs)
             w_tilda = (elbo - elbo.logsumexp(dim = 0)).exp()
             latent_size = x.size(-1)
 
@@ -215,5 +213,12 @@ class IWAVE(BaseEstimator):
     def cov(self):
         try:
             return self.model.cholesky.cov.data.cpu()
+        except AttributeError:
+            return None
+        
+    @property
+    def latent_regression_weight(self):
+        try:
+            return self.model.lreg_weight.data.cpu()
         except AttributeError:
             return None
