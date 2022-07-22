@@ -74,7 +74,7 @@ Epoch =     871 Iter. =  27901 Cur. loss =   11.72   Intervals no change = 100
 Fitting ended in  50.44  seconds
 
 In [7]: rotator = Rotator(method = "geomin_obl")
-    ...: rotator.fit_transform(model.loadings) # Rotated loadings.
+   ...: rotator.fit_transform(model.loadings) # Rotated loadings.
 Out[7]: 
 array([[ 0.05,  0.19, -1.44,  0.04],
        [-0.04, -0.06, -1.25, -0.24],
