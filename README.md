@@ -46,17 +46,6 @@ To install the latest version on GitHub:
 
 ### Sample Code
 
-model = IWAVE(
-     learning_rate = 1e-3,
-     model_type = "grm",
-     Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
-     input_size = n_items,
-     inference_net_sizes = [100],
-     latent_size = 4,
-     n_cats = [3] * n_items,
-     correlated_factors = [0, 1, 2, 3],
-)
-
 ```python
 In [1]: import torch
    ...: from deepirtools import IWAVE, load_grm
