@@ -46,30 +46,81 @@ To install the latest version on GitHub:
 
 ### Sample Code
 
+model = IWAVE(
+     learning_rate = 1e-3,
+     model_type = "grm",
+     Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
+     input_size = n_items,
+     inference_net_sizes = [100],
+     latent_size = 4,
+     n_cats = [3] * n_items,
+     correlated_factors = [0, 1, 2, 3],
+)
+
 ```python
 In [1]: import torch
    ...: from deepirtools import IWAVE, load_grm
 
 In [2]: data = load_grm()["data"]
+
 In [3]: n_items = data.shape[1]
 
-model = IWAVE(
-    learning_rate = 1e-3,
-    model_type = "grm",
-    Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
-    input_size = n_items,
-    inference_net_sizes = [100],
-    latent_size = 4,
-    n_cats = [3] * n_items,
-    correlated_factors = [0, 1, 2, 3],
-)
-model.fit(data, iw_samples = 5)
+In [4]: model = IWAVE(
+   ...:      learning_rate = 1e-2,
+   ...:      model_type = "grm",
+   ...:      Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
+   ...:      input_size = n_items,
+   ...:      inference_net_sizes = [100],
+   ...:      latent_size = 4,
+   ...:      n_cats = [3] * n_items,
+   ...:      correlated_factors = [0, 1, 2, 3],
+   ...: )
 
-model.loadings
+Initializing model parameters
+Initialization ended in  0.0  seconds
 
-model.intercepts
+In [5]: model.fit(data, iw_samples = 5)
 
-model.cov_mat
+Fitting started
+Epoch =     750 Iter. =  24001 Cur. loss =   11.08   Intervals no change = 100
+Fitting ended in  83.68  seconds
+
+In [6]: model.loadings
+Out[6]: 
+tensor([[1.3244, 0.0000, 0.0000, 0.0000],
+        [1.4748, 0.0000, 0.0000, 0.0000],
+        [0.5382, 0.0000, 0.0000, 0.0000],
+        [0.0000, 0.6075, 0.0000, 0.0000],
+        [0.0000, 1.2025, 0.0000, 0.0000],
+        [0.0000, 1.6361, 0.0000, 0.0000],
+        [0.0000, 0.0000, 0.7412, 0.0000],
+        [0.0000, 0.0000, 0.6334, 0.0000],
+        [0.0000, 0.0000, 0.9824, 0.0000],
+        [0.0000, 0.0000, 0.0000, 1.7153],
+        [0.0000, 0.0000, 0.0000, 0.7477],
+        [0.0000, 0.0000, 0.0000, 0.7211]])
+
+In [7]: model.intercepts
+Out[7]: 
+tensor([[-1.2395,  1.4840],
+        [-0.6968,  1.2617],
+        [-0.4047,  0.3069],
+        [-2.0498,  1.3285],
+        [-2.8727,  1.0828],
+        [-0.2089,  1.8970],
+        [-1.6389,  0.6855],
+        [-0.4799,  0.9020],
+        [-1.1862,  1.7222],
+        [-1.1674,  0.2377],
+        [-0.6638,  2.5533],
+        [-2.8514,  2.7459]])
+
+In [8]: model.cov
+Out[8]: 
+tensor([[1.0000, 0.1653, 0.1868, 0.1920],
+        [0.1653, 1.0000, 0.1767, 0.1846],
+        [0.1868, 0.1767, 1.0000, 0.1410],
+        [0.1920, 0.1846, 0.1410, 1.0000]])
 ```
 
 ### Tutorial
