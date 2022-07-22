@@ -47,11 +47,11 @@ To install the latest version on GitHub:
 ### Sample Code
 
 ```python
-import torch
-from deepirtools import IWAVE, load_grm
+In [1]: import torch
+   ...: from deepirtools import IWAVE, load_grm
 
-data = load_grm()["data"]
-n_items = data.shape[1]
+In [2]: data = load_grm()["data"]
+In [3]: n_items = data.shape[1]
 
 model = IWAVE(
     learning_rate = 1e-3,
@@ -64,6 +64,12 @@ model = IWAVE(
     correlated_factors = [0, 1, 2, 3],
 )
 model.fit(data, iw_samples = 5)
+
+model.loadings
+
+model.intercepts
+
+model.cov_mat
 ```
 
 ### Tutorial
