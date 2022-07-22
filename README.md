@@ -44,12 +44,16 @@ To install the latest version on GitHub:
 
 ## Examples
 
-### Exploratory Example
+### Tutorial
+
+[`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data.
+
+### Confirmatory Example
 
 ```python
 In [1]: import deepirtools
    ...: from deepirtools import IWAVE
-   ...: from factor_analyzer import Rotator
+   ...: import torch
 
 In [2]: deepirtools.manual_seed(123)
 
@@ -58,63 +62,60 @@ In [3]: data = deepirtools.load_grm()["data"]
 In [4]: n_items = data.shape[1]
 
 In [5]: model = IWAVE(
-   ...:      model_type = "grm",
-   ...:      input_size = n_items,
-   ...:      latent_size = 4,
-   ...:      n_cats = [3] * n_items,
+   ...:       model_type = "grm",
+   ...:       input_size = n_items,
+   ...:       latent_size = 4,
+   ...:       n_cats = [3] * n_items,
+   ...:       Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
+   ...:       correlated_factors = [0, 1, 2, 3],
    ...: )
 
 Initializing model parameters
 Initialization ended in  0.0  seconds
 
-In [6]: model.fit(data, iw_samples = 10)
+In [6]: model.fit(data, iw_samples = 5)
 
 Fitting started
-Epoch =     871 Iter. =  27901 Cur. loss =   11.72   Intervals no change = 100
-Fitting ended in  50.44  seconds
+Epoch =     846 Iter. =  27101 Cur. loss =   11.15   Intervals no change = 100
+Fitting ended in  95.14  seconds
 
-In [7]: rotator = Rotator(method = "geomin_obl")
-   ...: rotator.fit_transform(model.loadings) # Rotated loadings.
+In [7]: model.loadings # Loadings matrix.
 Out[7]: 
-array([[ 0.05,  0.19, -1.44,  0.04],
-       [-0.04, -0.06, -1.25, -0.24],
-       [-0.01,  0.02, -0.52, -0.09],
-       [ 0.59,  0.03,  0.02, -0.03],
-       [ 1.01, -0.08, -0.  , -0.3 ],
-       [ 1.64,  0.05, -0.01,  0.02],
-       [-0.  ,  0.99,  0.06, -0.02],
-       [-0.04,  0.54, -0.01, -0.03],
-       [ 0.02,  0.84, -0.06, -0.  ],
-       [ 0.06,  0.07,  0.05, -1.26],
-       [-0.03, -0.06, -0.06, -0.82],
-       [-0.02,  0.37, -0.06, -0.6 ]])
+tensor([[1.4004, 0.0000, 0.0000, 0.0000],
+        [1.3816, 0.0000, 0.0000, 0.0000],
+        [0.5557, 0.0000, 0.0000, 0.0000],
+        [0.0000, 0.5833, 0.0000, 0.0000],
+        [0.0000, 1.0996, 0.0000, 0.0000],
+        [0.0000, 1.7175, 0.0000, 0.0000],
+        [0.0000, 0.0000, 0.7294, 0.0000],
+        [0.0000, 0.0000, 0.5775, 0.0000],
+        [0.0000, 0.0000, 1.1082, 0.0000],
+        [0.0000, 0.0000, 0.0000, 1.6827],
+        [0.0000, 0.0000, 0.0000, 0.7021],
+        [0.0000, 0.0000, 0.0000, 0.6706]])
 
 In [8]: model.intercepts # Category intercepts.
 Out[8]: 
-tensor([[-1.33,  1.51],
-        [-0.68,  1.20],
-        [-0.41,  0.31],
-        [-2.05,  1.32],
-        [-2.88,  1.04],
-        [-0.24,  1.93],
-        [-1.76,  0.74],
-        [-0.45,  0.86],
-        [-1.14,  1.66],
-        [-1.04,  0.18],
-        [-0.70,  2.59],
-        [-2.86,  2.75]])
+tensor([[-1.2907,  1.4794],
+        [-0.6921,  1.2275],
+        [-0.4097,  0.3086],
+        [-2.0435,  1.3194],
+        [-2.8560,  1.0286],
+        [-0.2557,  1.9871],
+        [-1.6538,  0.6874],
+        [-0.4569,  0.8666],
+        [-1.2310,  1.7704],
+        [-1.1810,  0.2015],
+        [-0.6825,  2.5192],
+        [-2.8031,  2.7023]])
 
-In [9]: rotator.phi_ # Factor covariance matrix.
+In [9]: model.cov # Factor covariance matrix.
 Out[9]: 
-array([[ 1.  ,  0.16, -0.16, -0.22],
-       [ 0.16,  1.  , -0.18, -0.18],
-       [-0.16, -0.18,  1.  ,  0.22],
-       [-0.22, -0.18,  0.22,  1.  ]])
+tensor([[1.0000, 0.1679, 0.1489, 0.2227],
+        [0.1679, 1.0000, 0.1406, 0.2248],
+        [0.1489, 0.1406, 1.0000, 0.1452],
+        [0.2227, 0.2248, 0.1452, 1.0000]])
 ```
-
-### Tutorial
-
-[`examples/big_5_tutorial.ipynb`](examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data.
 
 ## Documentation
 
