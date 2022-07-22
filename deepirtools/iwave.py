@@ -29,8 +29,8 @@ MODEL_TYPES = {"grm" : GradedResponseModel,
 class IWAVE(BaseEstimator):
     
     def __init__(self,
-                 learning_rate:       float,
                  model_type:          str,
+                 learning_rate:       float = 1e-3,
                  device:              str = "cpu",
                  gradient_estimator:  str = "dreg",
                  log_interval:        int = 100,
@@ -41,7 +41,6 @@ class IWAVE(BaseEstimator):
         Importance-weighted amortized variational estimator (I-WAVE).
         
         Args:
-            learning_rate      (float): Step size for stochastic gradient optimizer. May require tuning.
             model_type         (str):   Measurement model type. Current options are:
                                             "grm"               = graded response model
                                             "gpcm"              = generalized partial credit model
@@ -49,6 +48,7 @@ class IWAVE(BaseEstimator):
                                             "negative_binomial" = negative binomial factor model
                                             "normal"            = normal factor model
                                             "lognormal"         = lognormal factor model
+            learning_rate      (float): Step size for stochastic gradient optimizer.
             device             (str):   Computing device used for fitting.
             gradient_estimator (str):   Gradient estimator for inference model parameters:
                                             "dreg" = doubly reparameterized gradient estimator

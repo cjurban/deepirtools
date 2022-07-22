@@ -44,72 +44,72 @@ To install the latest version on GitHub:
 
 ## Examples
 
-### Sample Code
+### Exploratory Example
 
 ```python
-In [1]: import torch
-   ...: from deepirtools import IWAVE, load_grm
+In [1]: import deepirtools
+   ...: from deepirtools import IWAVE
+   ...: from factor_analyzer import Rotator
 
-In [2]: data = load_grm()["data"]
+In [2]: deepirtools.manual_seed(123)
 
-In [3]: n_items = data.shape[1]
+In [3]: data = deepirtools.load_grm()["data"]
 
-In [4]: model = IWAVE(
-   ...:      learning_rate = 1e-2,
+In [4]: n_items = data.shape[1]
+
+In [5]: model = IWAVE(
    ...:      model_type = "grm",
-   ...:      Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
    ...:      input_size = n_items,
-   ...:      inference_net_sizes = [100],
    ...:      latent_size = 4,
    ...:      n_cats = [3] * n_items,
-   ...:      correlated_factors = [0, 1, 2, 3],
    ...: )
 
 Initializing model parameters
 Initialization ended in  0.0  seconds
 
-In [5]: model.fit(data, iw_samples = 5)
+In [6]: model.fit(data, iw_samples = 10)
 
 Fitting started
-Epoch =     750 Iter. =  24001 Cur. loss =   11.08   Intervals no change = 100
-Fitting ended in  83.68  seconds
+Epoch =     871 Iter. =  27901 Cur. loss =   11.72   Intervals no change = 100
+Fitting ended in  50.44  seconds
 
-In [6]: model.loadings
-Out[6]: 
-tensor([[1.3244, 0.0000, 0.0000, 0.0000],
-        [1.4748, 0.0000, 0.0000, 0.0000],
-        [0.5382, 0.0000, 0.0000, 0.0000],
-        [0.0000, 0.6075, 0.0000, 0.0000],
-        [0.0000, 1.2025, 0.0000, 0.0000],
-        [0.0000, 1.6361, 0.0000, 0.0000],
-        [0.0000, 0.0000, 0.7412, 0.0000],
-        [0.0000, 0.0000, 0.6334, 0.0000],
-        [0.0000, 0.0000, 0.9824, 0.0000],
-        [0.0000, 0.0000, 0.0000, 1.7153],
-        [0.0000, 0.0000, 0.0000, 0.7477],
-        [0.0000, 0.0000, 0.0000, 0.7211]])
+In [22]: rotator = Rotator(method = "geomin_obl")
+    ...: rotator.fit_transform(model.loadings) # Rotated loadings.
+Out[22]: 
+array([[ 0.05,  0.19, -1.44,  0.04],
+       [-0.04, -0.06, -1.25, -0.24],
+       [-0.01,  0.02, -0.52, -0.09],
+       [ 0.59,  0.03,  0.02, -0.03],
+       [ 1.01, -0.08, -0.  , -0.3 ],
+       [ 1.64,  0.05, -0.01,  0.02],
+       [-0.  ,  0.99,  0.06, -0.02],
+       [-0.04,  0.54, -0.01, -0.03],
+       [ 0.02,  0.84, -0.06, -0.  ],
+       [ 0.06,  0.07,  0.05, -1.26],
+       [-0.03, -0.06, -0.06, -0.82],
+       [-0.02,  0.37, -0.06, -0.6 ]])
 
-In [7]: model.intercepts
-Out[7]: 
-tensor([[-1.2395,  1.4840],
-        [-0.6968,  1.2617],
-        [-0.4047,  0.3069],
-        [-2.0498,  1.3285],
-        [-2.8727,  1.0828],
-        [-0.2089,  1.8970],
-        [-1.6389,  0.6855],
-        [-0.4799,  0.9020],
-        [-1.1862,  1.7222],
-        [-1.1674,  0.2377],
-        [-0.6638,  2.5533],
-        [-2.8514,  2.7459]])
+In [32]: model.intercepts # Category intercepts.
+Out[32]: 
+tensor([[-1.33,  1.51],
+        [-0.68,  1.20],
+        [-0.41,  0.31],
+        [-2.05,  1.32],
+        [-2.88,  1.04],
+        [-0.24,  1.93],
+        [-1.76,  0.74],
+        [-0.45,  0.86],
+        [-1.14,  1.66],
+        [-1.04,  0.18],
+        [-0.70,  2.59],
+        [-2.86,  2.75]])
 
-In [8]: model.cov
-Out[8]: 
-tensor([[1.0000, 0.1653, 0.1868, 0.1920],
-        [0.1653, 1.0000, 0.1767, 0.1846],
-        [0.1868, 0.1767, 1.0000, 0.1410],
-        [0.1920, 0.1846, 0.1410, 1.0000]])
+In [28]: rotator.phi_ # Factor covariance matrix.
+Out[28]: 
+array([[ 1.  ,  0.16, -0.16, -0.22],
+       [ 0.16,  1.  , -0.18, -0.18],
+       [-0.16, -0.18,  1.  ,  0.22],
+       [-0.22, -0.18,  0.22,  1.  ]])
 ```
 
 ### Tutorial

@@ -11,8 +11,8 @@ def screeplot(latent_sizes:             List[int],
               data:                     torch.Tensor,
               model_type:               str,
               test_size:                float,
-              inference_net_sizes_list: List[List[int]],
-              learning_rates:           List[float],
+              inference_net_sizes_list: Optional[List[List[int]]] = None,
+              learning_rates:           Optional[List[float]] = None,
               missing_mask:             Optional[torch.Tensor] = None,
               max_epochs:               int = 100000,
               batch_size:               int = 32,
@@ -58,20 +58,26 @@ def screeplot(latent_sizes:             List[int],
     data_train = data[train_idxs]; mask_train = missing_mask[train_idxs]
     data_test = data[test_idxs]; mask_test = missing_mask[test_idxs]
     
-    latent_sizes.sort()
+    if inference_net_sizes_list is None:
+        inference_net_sizes_list = [[100]] * len(latent_sizes)
+    if learning_rates is None:
+        learning_rates = [1e-3] * len(latent_sizes)
+    latent_sizes, learning_rates, inference_net_sizes_list = zip(*sorted(zip(latent_sizes,
+                                                                             learning_rates,
+                                                                             inference_net_sizes_list)))
             
     manual_seed(random_seed)
     ll_list = []
     for idx, latent_size in enumerate(latent_sizes):
         print("\nLatent size = ", latent_size, end="\n")
-        model = IWAVE(learning_rate = learning_rates[idx],
+        model = IWAVE(model_type = model_type,
+                      learning_rate = learning_rates[idx],
                       device = device,
-                      model_type = model_type,
                       gradient_estimator = gradient_estimator,
                       log_interval = log_interval,
                       input_size = n_items,
-                      inference_net_sizes = inference_net_sizes_list[idx],
                       latent_size = latent_size,
+                      inference_net_sizes = inference_net_sizes_list[idx],
                       **model_kwargs,
                      )
         model.fit(data_train, batch_size = batch_size, missing_mask = mask_train,
