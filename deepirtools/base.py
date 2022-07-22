@@ -15,7 +15,7 @@ class OptimizationWarning(UserWarning):
 class BaseEstimator():
 
     def __init__(self,
-                 device:                str,
+                 device:                str = "cpu",
                  log_interval:          int = 100,
                  verbose:               bool = True,
                 ):
