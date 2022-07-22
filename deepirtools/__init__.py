@@ -6,5 +6,6 @@ from .utils import (manual_seed,
                     normalize_ints,
                    )
 from .figures import screeplot, loadings_heatmap
+from .data import load_grm
 
-__version__ = "1.1.43"
+__version__ = "1.1.48"
