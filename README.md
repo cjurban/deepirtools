@@ -73,9 +73,9 @@ Fitting started
 Epoch =     871 Iter. =  27901 Cur. loss =   11.72   Intervals no change = 100
 Fitting ended in  50.44  seconds
 
-In [22]: rotator = Rotator(method = "geomin_obl")
+In [7]: rotator = Rotator(method = "geomin_obl")
     ...: rotator.fit_transform(model.loadings) # Rotated loadings.
-Out[22]: 
+Out[7]: 
 array([[ 0.05,  0.19, -1.44,  0.04],
        [-0.04, -0.06, -1.25, -0.24],
        [-0.01,  0.02, -0.52, -0.09],
@@ -89,8 +89,8 @@ array([[ 0.05,  0.19, -1.44,  0.04],
        [-0.03, -0.06, -0.06, -0.82],
        [-0.02,  0.37, -0.06, -0.6 ]])
 
-In [32]: model.intercepts # Category intercepts.
-Out[32]: 
+In [8]: model.intercepts # Category intercepts.
+Out[8]: 
 tensor([[-1.33,  1.51],
         [-0.68,  1.20],
         [-0.41,  0.31],
@@ -104,8 +104,8 @@ tensor([[-1.33,  1.51],
         [-0.70,  2.59],
         [-2.86,  2.75]])
 
-In [28]: rotator.phi_ # Factor covariance matrix.
-Out[28]: 
+In [9]: rotator.phi_ # Factor covariance matrix.
+Out[9]: 
 array([[ 1.  ,  0.16, -0.16, -0.22],
        [ 0.16,  1.  , -0.18, -0.18],
        [-0.16, -0.18,  1.  ,  0.22],
