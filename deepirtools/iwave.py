@@ -3,33 +3,20 @@ from torch.optim import Adam
 from torch.distributions.utils import logits_to_probs
 import math
 import timeit
-from typing import List, Optional
+from typing import List, Optional, Union
 from deepirtools.base import BaseEstimator
-from deepirtools.models import (GradedResponseModel,
-                                GeneralizedPartialCreditModel,
-                                PoissonFactorModel,
-                                NegativeBinomialFactorModel,
-                                NormalFactorModel,
-                                LogNormalFactorModel,
+from deepirtools.models import (ModelTypes,
+                                MixedFactorModel,
                                 VariationalAutoencoder,
                                )
 from deepirtools.utils import tensor_dataset
-
-
-GRAD_ESTIMATORS = ("iwae", "dreg")
-MODEL_TYPES = {"grm" : GradedResponseModel,
-               "gpcm" : GeneralizedPartialCreditModel,
-               "poisson" : PoissonFactorModel,
-               "negative_binomial" : NegativeBinomialFactorModel,
-               "normal" : NormalFactorModel,
-               "lognormal" : LogNormalFactorModel,
-              }
+from deepirtools.settings import GRAD_ESTIMATORS
 
   
 class IWAVE(BaseEstimator):
     
     def __init__(self,
-                 model_type:          str,
+                 model_type:          Union[str, List[str]],
                  learning_rate:       float = 1e-3,
                  device:              str = "cpu",
                  gradient_estimator:  str = "dreg",
@@ -41,30 +28,37 @@ class IWAVE(BaseEstimator):
         Importance-weighted amortized variational estimator (I-WAVE).
         
         Args:
-            model_type         (str):   Measurement model type. Current options are:
-                                            "grm"               = graded response model
-                                            "gpcm"              = generalized partial credit model
-                                            "poisson"           = poisson factor model
-                                            "negative_binomial" = negative binomial factor model
-                                            "normal"            = normal factor model
-                                            "lognormal"         = lognormal factor model
-            learning_rate      (float): Step size for stochastic gradient optimizer.
-            device             (str):   Computing device used for fitting.
-            gradient_estimator (str):   Gradient estimator for inference model parameters:
-                                            "dreg" = doubly reparameterized gradient estimator
-                                            "iwae" = standard gradient estimator
-            log_interval       (str):   Frequency of updates printed during fitting.
-            verbose            (bool):  Whether to print updates during fitting.
-            model_kwargs       (dict):  Named parameters passed to VariationalAutoencoder.__init__().
+            model_type         (str/List of str): Measurement model type. Can either be a string if all items
+                                                  have same type or a list of strings specifying each item type.
+                                                  Current options are:
+                                                      "grm"               = graded response model
+                                                      "gpcm"              = generalized partial credit model
+                                                      "poisson"           = poisson factor model
+                                                      "negative_binomial" = negative binomial factor model
+                                                      "normal"            = normal factor model
+                                                      "lognormal"         = lognormal factor model
+            learning_rate      (float):           Step size for stochastic gradient optimizer.
+            device             (str):             Computing device used for fitting.
+            gradient_estimator (str):             Gradient estimator for inference model parameters:
+                                                      "dreg" = doubly reparameterized gradient estimator
+                                                      "iwae" = standard gradient estimator
+            log_interval       (str):             Frequency of updates printed during fitting.
+            verbose            (bool):            Whether to print updates during fitting.
+            model_kwargs       (dict):            Named parameters passed to VariationalAutoencoder.__init__().
         """
         super().__init__(device, log_interval, verbose)
         assert(gradient_estimator in GRAD_ESTIMATORS), "gradient_estimator must be one of {}".format(GRAD_ESTIMATORS)
         self.grad_estimator = gradient_estimator
         self.runtime_kwargs["grad_estimator"] = gradient_estimator
         
-        model_types = {k for k, _ in MODEL_TYPES.items()}
-        assert(model_type in model_types), "model_type must be one of {}".format(model_types)
-        decoder = MODEL_TYPES[model_type]
+        model_names = [k for k, _ in ModelTypes().MODEL_TYPES.items()]
+        if isinstance(model_type, list):
+            assert(all(m in model_names for m in model_type)), "All elements of model_type must be one of {}".format(model_names)
+            model_kwargs["model_types"] = model_type
+            decoder = MixedFactorModel
+        else:
+            assert(model_type in model_names), "model_type must be one of {}".format(model_names)
+            decoder = ModelTypes().MODEL_TYPES[model_type]
         
         if verbose:
             print("\nInitializing model parameters", end = "")
@@ -201,12 +195,16 @@ class IWAVE(BaseEstimator):
             return self.model.decoder.residual_std.data.cpu()
         except AttributeError:
             return None
+        except TypeError:
+            return None
     
     @property
     def probs(self):
         try:
             logits_to_probs(self.model.decoder.logits.data.cpu(), is_binary = True)
         except AttributeError:
+            return None
+        except TypeError:
             return None
     
     @property

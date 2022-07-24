@@ -27,7 +27,7 @@ All models are estimable in both confirmatory and exploratory contexts. In the c
 
 ## Requirements
 
--  Python 3.6 or higher
+-  Python 3.7 or higher
 -  ``torch``
 -  ``pyro-ppl``
 -  ``numpy``

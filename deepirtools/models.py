@@ -7,13 +7,12 @@ import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
 from deepirtools.utils import get_thresholds
-from typing import List, Optional
+from deepirtools.settings import EPS
+from typing import List, Optional, Union
+from operator import itemgetter
 import itertools
 import inspect
 import logging
-
-
-EPS = 1e-7
 
 
 ################################################################################
@@ -135,12 +134,13 @@ class CategoricalBias(nn.Module):
 class GradedBaseModel(nn.Module):
     
     def __init__(self,
-                 latent_size: int,
-                 n_cats:      List[int],
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_cats:       List[int],
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
         """
         Base model for graded responses.
@@ -152,23 +152,29 @@ class GradedBaseModel(nn.Module):
             A           (Tensor):      Matrix imposing linear constraints on loadings.
             b           (Tensor):      Vector imposing linear constraints on loadings.
             ints_mask   (Tensor):      Vector constraining first intercepts to zero.
+            _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
         """
         super(GradedBaseModel, self).__init__()
         
-        assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
-        if Q is not None:
-            assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
-            self._loadings = SparseLinear(latent_size, len(n_cats), Q)
-        elif A is not None:
-            self._loadings = LinearConstraints(latent_size, len(n_cats), A, b)
-        else:
-            self._loadings = nn.Linear(latent_size, len(n_cats), bias = False)
-        self.Q = Q
-        self.A = A
+        if not _no_loadings:
+            assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
+            if Q is not None:
+                assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
+                assert(len(Q.shape) == 2), "Q must be 2D."
+                self._loadings = SparseLinear(latent_size, len(n_cats), Q)
+            elif A is not None:
+                assert(len(A.shape) == 2), "A must be 2D."
+                if b is not None:
+                    assert(len(b.shape) == 1), "b must be 1D."
+                self._loadings = LinearConstraints(latent_size, len(n_cats), A, b)
+            else:
+                self._loadings = nn.Linear(latent_size, len(n_cats), bias = False)
+            self.Q = Q
+            self.A = A
+        self._no_loadings = _no_loadings
         
         if ints_mask is not None:
-            assert(ints_mask.numel() == len(n_cats)), "ints_mask must be same size as number of items."
-            ints_mask = ints_mask.clone().view(-1, 1)
+            assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."
             assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
         self._intercepts = CategoricalBias(n_cats, ints_mask)
         self.n_cats = n_cats
@@ -176,8 +182,9 @@ class GradedBaseModel(nn.Module):
         self.reset_parameters()
         
     def reset_parameters(self):
-        if self.Q is None and self.A is None:
-            nn.init.xavier_uniform_(self._loadings.weight)
+        if not self._no_loadings:
+            if self.Q is None and self.A is None:
+                nn.init.xavier_uniform_(self._loadings.weight)
 
     def forward(self):
         """Compute log p(data | latents)."""
@@ -185,7 +192,10 @@ class GradedBaseModel(nn.Module):
         
     @property
     def loadings(self):
-        return self._loadings.weight.data
+        try:
+            return self._loadings.weight.data
+        except AttributeError:
+            return None
     
     @property
     def intercepts(self):
@@ -195,23 +205,28 @@ class GradedBaseModel(nn.Module):
 class GradedResponseModel(GradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_cats:      List[int],
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_cats:       List[int],
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
         """Samejima's graded response model."""
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
 
     def forward(self,
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
-        Bx = self._loadings(x)
+        if loadings is None:
+            Bx = self._loadings(x)
+        else:
+            Bx = F.linear(x, loadings)
         cum_probs = self._intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
                                                              torch.Size([max(self.n_cats) - 1]))).sigmoid()
         upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
@@ -228,25 +243,30 @@ class GradedResponseModel(GradedBaseModel):
 class GeneralizedPartialCreditModel(GradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_cats:      List[int],
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_cats:       List[int],
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
         """Generalized partial credit model."""
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
 
     def forward(self,
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
         M = max(self.n_cats)
         
-        Bx = self._loadings(x)
+        if loadings is None:
+            Bx = self._loadings(x)
+        else:
+            Bx = F.linear(x, loadings)
         shape = Bx.shape + torch.Size([M])
         kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
         
@@ -266,12 +286,13 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
 class NonGradedBaseModel(nn.Module):
     
     def __init__(self,
-                 latent_size: int,
-                 n_items:     int,
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_items:      int,
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
         """
         Base model for non-graded responses.
@@ -283,21 +304,29 @@ class NonGradedBaseModel(nn.Module):
             A           (Tensor):      Matrix imposing linear constraints on loadings.
             b           (Tensor):      Vector imposing linear constraints on loadings.
             ints_mask   (Tensor):      Vector constraining specific intercepts to zero.
+            _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
         """
         super(NonGradedBaseModel, self).__init__()
         
-        assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
-        if Q is not None:
-            assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
-            self._loadings = SparseLinear(latent_size, n_items, Q)
-        elif A is not None:
-            self._loadings = LinearConstraints(latent_size, n_items, A, b)
-        else:
-            self._loadings = nn.Linear(latent_size, n_items, bias = False)
-        self.Q = Q
-        self.A = A
+        if not _no_loadings:
+            assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
+            if Q is not None:
+                assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
+                assert(len(Q.shape) == 2), "Q must be 2D."
+                self._loadings = SparseLinear(latent_size, n_items, Q)
+            elif A is not None:
+                assert(len(A.shape) == 2), "A must be 2D."
+                if b is not None:
+                    assert(len(b.shape) == 1), "b must be 1D."
+                self._loadings = LinearConstraints(latent_size, n_items, A, b)
+            else:
+                self._loadings = nn.Linear(latent_size, n_items, bias = False)
+            self.Q = Q
+            self.A = A
+        self._no_loadings = _no_loadings
         
         if ints_mask is not None:
+            assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."
             assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
         self._bias = nn.Parameter(torch.empty(n_items))
         self.ints_mask = ints_mask
@@ -305,8 +334,9 @@ class NonGradedBaseModel(nn.Module):
         self._reset_parameters()
         
     def _reset_parameters(self):
-        if self.Q is None and self.A is None:
-            nn.init.xavier_uniform_(self._loadings.weight)
+        if not self._no_loadings:
+            if self.Q is None and self.A is None:
+                nn.init.xavier_uniform_(self._loadings.weight)
         nn.init.normal_(self._bias, mean=0., std=0.001)
         
     def forward(self):
@@ -322,7 +352,10 @@ class NonGradedBaseModel(nn.Module):
         
     @property
     def loadings(self):
-        return self._loadings.weight.data
+        try:
+            return self._loadings.weight.data
+        except AttributeError:
+            return None
         
     @property
     def intercepts(self):
@@ -332,22 +365,28 @@ class NonGradedBaseModel(nn.Module):
 class PoissonFactorModel(NonGradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_items:     int,
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_items:      int,
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
+        """Poisson factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
             
     def forward(self,
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
-        log_rate = self._loadings(x) + self.bias
+        if loadings is None:
+            log_rate = self._loadings(x) + self.bias
+        else:
+            log_rate = F.linear(x, loadings, self.bias)
         
         py_x = pydist.Poisson(rate = log_rate.exp().clamp(min = EPS, max = 100))
         return -py_x.log_prob(y).sum(-1, keepdim = True)
@@ -356,15 +395,17 @@ class PoissonFactorModel(NonGradedBaseModel):
 class NegativeBinomialFactorModel(NonGradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_items:     int,
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_items:      int,
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
+        """Negative binomial factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
         
         self.logits = nn.Parameter(torch.empty(n_items))
         
@@ -377,8 +418,12 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
-        log_total_count = self._loadings(x) + self.bias
+        if loadings is None:
+            log_total_count = self._loadings(x) + self.bias
+        else:
+            log_total_count = F.linear(x, loadings, self.bias)
         
         py_x = pydist.NegativeBinomial(total_count = log_total_count.exp().clamp(min = EPS, max = 100),
                                        logits = self.logits)
@@ -388,15 +433,17 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
 class NormalFactorModel(NonGradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_items:     int,
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_items:      int,
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
+        """Normal (linear) factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
         
         self.free_phi = nn.Parameter(torch.empty(n_items))
         
@@ -409,8 +456,12 @@ class NormalFactorModel(NonGradedBaseModel):
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
-        loc = self._loadings(x) + self.bias
+        if loadings is None:
+            loc = self._loadings(x) + self.bias
+        else:
+            loc = F.linear(x, loadings, self.bias)
         
         py_x = pydist.Normal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
@@ -423,15 +474,17 @@ class NormalFactorModel(NonGradedBaseModel):
 class LogNormalFactorModel(NonGradedBaseModel):
     
     def __init__(self,
-                 latent_size: int,
-                 n_items:     int,
-                 Q:           Optional[torch.Tensor] = None,
-                 A:           Optional[torch.Tensor] = None,
-                 b:           Optional[torch.Tensor] = None,
-                 ints_mask:   Optional[torch.Tensor] = None,
+                 latent_size:  int,
+                 n_items:      int,
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
                 ):
+        """Lognormal factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
-                         ints_mask = ints_mask)
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
         
         self.free_phi = nn.Parameter(torch.empty(n_items))
         
@@ -444,8 +497,12 @@ class LogNormalFactorModel(NonGradedBaseModel):
                 x: torch.Tensor,
                 y: torch.Tensor,
                 mask: Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
                ):
-        loc = self._loadings(x) + self.bias
+        if loadings is None:
+            loc = self._loadings(x) + self.bias
+        else:
+            loc = F.linear(x, loadings, self.bias)
         
         py_x = pydist.LogNormal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
@@ -453,7 +510,181 @@ class LogNormalFactorModel(NonGradedBaseModel):
     @property
     def residual_std(self):
         return F.softplus(self.free_phi) + EPS
+    
+    
+class ModelTypes():
+    
+    MODEL_TYPES = {"grm" : GradedResponseModel,
+                   "gpcm" : GeneralizedPartialCreditModel,
+                   "poisson" : PoissonFactorModel,
+                   "negative_binomial" : NegativeBinomialFactorModel,
+                   "normal" : NormalFactorModel,
+                   "lognormal" : LogNormalFactorModel,
+                  }
+    
+    
+class MixedFactorModel(nn.Module):
+    
+    def __init__(self,
+                 latent_size: int,
+                 model_types: List[str],
+                 n_cats:      Optional[List[Union[int, None]]] = None,
+                 n_items:     Optional[int] = None,
+                 Q:           Optional[torch.Tensor] = None,
+                 A:           Optional[torch.Tensor] = None,
+                 b:           Optional[torch.Tensor] = None,
+                 ints_mask:   Optional[torch.Tensor] = None,
+                ):
+        """
+        Factor model with mixed item types.
+                
+        Args:
+            latent_size (int):              Number of latent variables.
+            model_types (List of str):      Model type for each item.
+            n_cats      (List of int/None): Number of categories for each item. Continuous items and counts
+                                            are indicated with None.
+                                                E.g., if items 1-2 have are categorical w/ 3 categories, item 3
+                                                is continuous, and item 4 is categorical w/ 2 categories, set
+                                                n_cats = [3, 3, None, 2]
+            n_items     (int):              Number of items. Does not need to be specified if n_cats is given.
+            Q           (Tensor):           Binary matrix indicating measurement structure.
+            A           (Tensor):           Matrix imposing linear constraints on loadings.
+            b           (Tensor):           Vector imposing linear constraints on loadings.
+            ints_mask   (Tensor):           Vector constraining specific intercepts to zero.
+        """
+        super(MixedFactorModel, self).__init__()
+        assert(not (n_items is None and n_cats is None)), "Must define either n_items or n_cats."
+        if n_items is None:
+            n_items = len(n_cats)
             
+        sorted_idxs, sorted_model_types = zip(*sorted(enumerate(model_types), key = itemgetter(1)))
+        n_items_per_model = [len(list(g)) for k, g in itertools.groupby(sorted_model_types)]
+        self.cum_idxs = torch.Tensor([0] + n_items_per_model).cumsum(dim  = 0).long()
+        self.sorted_idxs = torch.Tensor(sorted_idxs).long()
+        
+        unsorted_idxs = torch.zeros(n_items).long()
+        unsorted_idxs[self.sorted_idxs] = torch.arange(n_items)
+        self.unsorted_idxs = unsorted_idxs
+            
+        assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
+        if Q is not None:
+            assert(((Q == 0) + (Q == 1)).all()), "Q must only contain ones and zeros."
+            assert(len(Q.shape) == 2), "Q must be 2D."
+            self._loadings = SparseLinear(latent_size, n_items, Q)
+            check_mat = Q[self.sorted_idxs]
+        elif A is not None:
+            assert(len(A.shape) == 2), "A must be 2D."
+            if b is not None:
+                assert(len(b.shape) == 1), "b must be 1D."
+            self._loadings = LinearConstraints(latent_size, n_items, A, b)
+            check_mat = F.linear(torch.ones([A.shape[1]]), A, b).view(latent_size, n_items).T[self.sorted_idxs]
+        else:
+            self._loadings = nn.Linear(latent_size, n_items, bias = False)
+            check_mat = torch.ones([n_items, latent_size])
+        self.Q = Q
+        self.A = A
+        
+        unique_model_types = list(dict.fromkeys(sorted_model_types))
+        _models = tuple(ModelTypes().MODEL_TYPES[m] for m in unique_model_types)
+        
+        keep_idxs = []
+        models = []
+        for model_idx, (idx1, idx2) in enumerate(zip(self.cum_idxs[:-1], self.cum_idxs[1:])):
+            keep_idx = check_mat[self.sorted_idxs][idx1:idx2].sum(dim = 0).gt(0)
+            keep_idxs.append(keep_idx)
+            if ints_mask is not None:
+                assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."
+                assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
+                _ints_mask = ints_mask[self.sorted_idxs][idx1:idx2]
+            else:
+                _ints_mask = None
+            if unique_model_types[model_idx] in ("grm", "gpcm"):
+                model_kwargs = {"n_cats" : [n_cats[i] for i in sorted_idxs][idx1:idx2]}
+            else:
+                model_kwargs = {"n_items" : (idx2 - idx1).item()}
+            models.append(_models[model_idx](latent_size = max(1, keep_idx.sum().item()),
+                                             ints_mask = _ints_mask, _no_loadings = True, **model_kwargs))
+            self.keep_idxs = keep_idxs
+            self.models = nn.ModuleList(models)
+            
+            self.reset_parameters()
+            
+    def reset_parameters(self):
+        if self.Q is None and self.A is None:
+            nn.init.xavier_uniform_(self._loadings.weight)
+
+    def forward(self,
+                x: torch.Tensor,
+                y: torch.Tensor,
+                mask: Optional[torch.Tensor] = None,
+               ):
+        ldgs_sorted = self._loadings.weight[self.sorted_idxs]
+        y_sorted = y[:, self.sorted_idxs]
+        if mask is not None:
+            mask_sorted = mask[:, self.sorted_idxs]
+            
+        out = []
+        for model_idx, (idx1, idx2) in enumerate(zip(self.cum_idxs[:-1], self.cum_idxs[1:])):
+            keep_idx = self.keep_idxs[model_idx]
+            if keep_idx.sum().gt(0):
+                _ldgs_sorted = ldgs_sorted[idx1:idx2, keep_idx]
+                _x = x[..., keep_idx]
+            else: # Intercepts-only model.
+                _ldgs_sorted = torch.zeros([idx2 - idx1, 1])
+                _x = torch.zeros(x.size()[:-1] + torch.Size([1]))
+            _y_sorted = y_sorted[:, idx1:idx2]
+            if mask is not None:
+                _mask_sorted = mask_sorted[:, idx1:idx2]
+            else:
+                _mask_sorted = None
+            out.append(self.models[model_idx](x = _x, y = _y_sorted, mask = _mask_sorted,
+                                              loadings = _ldgs_sorted))
+        
+        return torch.cat(out, dim = -1).sum(-1, keepdim = True)
+    
+    @property
+    def loadings(self):
+        return self._loadings.weight.data
+        
+    @property
+    def intercepts(self):
+        ints = [m.intercepts.unsqueeze(1) if len(m.intercepts.shape) == 1 else
+                m.intercepts for m in self.models]
+        M = max([i.shape[-1]for i in ints])
+        ints = torch.cat([F.pad(i, (0, M - i.shape[1]), value = float("nan")) for
+                          i in ints], dim = 0)[self.unsorted_idxs]
+        return (ints.squeeze() if ints.shape[1] == 1 else ints)
+    
+    @property
+    def residual_std(self):
+        try:
+            residual_stds = []
+            for m in self.models:
+                try:
+                    residual_stds.append(m.residual_std)
+                except AttributeError:
+                    residual_stds.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
+            residual_std =  torch.cat(residual_stds, dim = 0)[self.unsorted_idxs]
+            assert(~residual_std.isnan().all())
+            return residual_std
+        except AssertionError:
+            return None
+    
+    @property
+    def logits(self):
+        try:
+            logits_list = []
+            for m in self.models:
+                try:
+                    logits_list.append(m.logits)
+                except AttributeError:
+                    logits_list.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
+            logits =  torch.cat(logits_list, dim = 0)[self.unsorted_idxs]
+            assert(~logits.isnan().all())
+            return logits
+        except AssertionError:
+            return None
+    
     
 ################################################################################
 #
