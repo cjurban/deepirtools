@@ -42,6 +42,8 @@ To install the latest version on GitHub:
 
 ``pip install git+https://github.com/cjurban/deepirtools``
 
+## Documentation
+
 ## Examples
 
 ### Tutorial
@@ -116,8 +118,6 @@ tensor([[1.0000, 0.1679, 0.1489, 0.2227],
         [0.1489, 0.1406, 1.0000, 0.1452],
         [0.2227, 0.2248, 0.1452, 1.0000]])
 ```
-
-## Documentation
 
 ## Citation
 
