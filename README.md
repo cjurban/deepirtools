@@ -1,7 +1,7 @@
 <h1 align='center'>DeepIRTools</h1>
 <h2 align='center'>Deep Learning-Based Estimation and Inference for Item Response Theory Models</h2>
 
-DeepIRTools is a small Python package that uses scalable deep learning methods to fit several kinds of confirmatory and exploratory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to parallelize some computations.
+DeepIRTools is a small Python package that uses scalable deep learning methods to fit a number of different confirmatory and exploratory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available to parallelize some computations.
 
 ## Description
 
@@ -23,7 +23,7 @@ The following (multidimensional) latent factor models are currently available...
   - Poisson factor model
   - Negative binomial factor model
 
-All models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings, intercepts, and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
+DeepIRTools supports mixing item types, handling missing at random data, and predicting the mean of the latent factors with covariates (i.e., latent regression modeling); all models are estimable in both confirmatory and exploratory contexts. In the confirmatory context, constraints on the factor loadings, intercepts, and factor covariance matrix are implemented by providing appropriate arguments to ``fit()``. In the exploratory context, the ``screeplot()`` function in the ``figures`` module may help identify the number of latent factors underlying the data.
 
 ## Requirements
 
