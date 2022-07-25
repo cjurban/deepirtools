@@ -4,6 +4,8 @@ from itertools import product
 import pytest
 import torch
 import numpy as np
+import rpy2.robjects as ro
+from rpy2.robjects.vectors import StrVector
 import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import invert_cov
@@ -19,6 +21,12 @@ ABS_TOL = 0.1
 EXPECTED_DIR = "expected"
 DATA_DIR = "data"
 
+utils = ro.packages.importr("utils")
+utils.chooseCRANmirror(ind = 1)
+pkgnames = ["mirt"]
+names_to_install = [pkg for pkg in pkgnames if not ro.packages.isinstalled(pkg)]
+if len(names_to_install) > 0:
+    utils.install_packages(StrVector(names_to_install))
 
 deepirtools.manual_seed(123)
 devices = ["cpu"]
@@ -34,9 +42,10 @@ def _test_args():
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
     
     prods = enumerated_product(["none", "binary", "linear"],
-                               ["grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal"],
+                               ["grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal", "mixed"],
                                [1, 5],
-                               ["fixed_variances_no_covariances", "fixed_variances"],
+                               ["fixed_variances_no_covariances", "fixed_variances", "free"],
+                               ["fixed_means", "latent_regression", "free"]
                                [True, False],
                                devices
                               )
@@ -54,12 +63,13 @@ def _test_args():
 #           - Recovery of residual stds. + probs.
 #           - GPU
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
-                          "cov_type, all_same_n_cats, device"), _test_args())
+                          "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
                         constraint_type: str,
                         model_type:      str,
                         latent_size:     int,
                         cov_type:        str,
+                        mean_type:       str,
                         all_same_n_cats: bool,
                         device:          str,
                        ):
@@ -69,8 +79,8 @@ def test_param_recovery(idx:             str,
     os.makedirs(expected_dir, exist_ok = True)
     os.makedirs(data_dir, exist_ok = True)
     
-    simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, sample_size,
-                           expected_dir, data_dir, all_same_n_cats)
+    simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, mean_type,
+                           sample_size, expected_dir, data_dir, all_same_n_cats)
     exp_ldgs, exp_ints, exp_cov_mat = (load_torch_from_csv(k + ".csv", expected_dir) for
                                        k in ("ldgs", "ints", "cov_mat"))
     if latent_size == 1:

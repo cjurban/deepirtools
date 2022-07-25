@@ -5,8 +5,17 @@ import torch.nn.functional as F
 import pyro.distributions as pydist
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-import subprocess
+import rpy2.robjects as ro
+from typing import Optional
 from deepirtools.utils import invert_factors
+
+
+ro.numpy2ri.activate()
+
+
+def load_torch_from_csv(name, top_dir):
+    t = np.loadtxt(os.path.join(top_dir, name), delimiter = ",")
+    return torch.from_numpy(t)
 
 
 class BaseFactorModelSimulator():
@@ -15,6 +24,7 @@ class BaseFactorModelSimulator():
                  loadings:   torch.Tensor,
                  intercepts: torch.Tensor,
                  cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
                 ):
         """Base class for simulating from a latent factor model."""
         super(BaseFactorModelSimulator, self).__init__()
@@ -22,9 +32,111 @@ class BaseFactorModelSimulator():
         self.loadings = loadings
         self.intercepts = intercepts
         self.cov_mat = cov_mat
+        self.mean = mean
+        
+    def _scores(self,
+                sample_size: Optional[int] = None,
+               ):
+        x_dist = pydist.MultivariateNormal(loc = self.mean, 
+                                           covariance_matrix = self.cov_mat)
+        if self.mean.shape[0] > 1:
+            return x_dist.sample()
+        else:
+            return x_dist.sample([sample_size]).squeeze(dim = -2)
         
     def sample(self):
         raise NotImplementedError
+        
+        
+class GradedResponseModelSimulator(BaseFactorModelSimulator):
+    
+    def __init__(self,
+                 loadings:   torch.Tensor,
+                 intercepts: torch.Tensor,
+                 cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
+                ):
+        """ Simulate from Samejima's graded response model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
+        
+    @torch.no_grad()    
+    def sample(self,
+               sample_size: Optional[int] = None,
+              ):
+        ro.r("rm(list = ls())")
+        ro.packages.importr("mirt")
+
+        ldgs_R = ro.r.matrix(self.loadings.numpy(), nrow = self.loadings.shape[0],
+                             ncol = self.loadings.shape[1])
+        ints_R = ro.r.matrix(self.intercepts.numpy(), nrow = self.intercepts.shape[0],
+                             ncol = self.intercepts.shape[1])
+        x = self._scores(sample_size)
+        Theta_R = ro.r.matrix(x.numpy(), nrow = x.shape[0], ncol = x.shape[1])
+        ro.r.assign("ldgs", ldgs_R); ro.r.assign("ints", ints_R); ro.r.assign("Theta", Theta_R)
+
+        ro.r("""
+                if (dim(ints)[2] > 1) {
+                  itemtype = ifelse(is.na(ints[, 2]), "2PL", "graded")
+                } else if (dim(ints)[2] == 1) {
+                  itemtype = rep("2PL", dim(ints)[1])
+                }
+
+                ldgs = matrix(as.vector(t(ldgs)), nrow = dim(ldgs)[1], byrow = TRUE)
+                ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
+                Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+
+                Y = simdata(a = ldgs,
+                            d = ints,
+                            itemtype = itemtype,
+                            Theta = Theta
+                           )
+             """)
+
+        return torch.from_numpy(ro.r["Y"])
+
+
+class GeneralizedPartialCreditModelSimulator(BaseFactorModelSimulator):
+    
+    def __init__(self,
+                 loadings:   torch.Tensor,
+                 intercepts: torch.Tensor,
+                 cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
+                ):
+        """ Simulate from the generalized partial credit model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
+        
+    @torch.no_grad()    
+    def sample(self,
+               sample_size: Optional[int] = None,
+              ):
+        ro.r("rm(list = ls())")
+        ro.packages.importr("mirt")
+
+        ldgs_R = ro.r.matrix(self.loadings.numpy(), nrow = self.loadings.shape[0],
+                             ncol = self.loadings.shape[1])
+        ints_R = ro.r.matrix(self.intercepts.numpy(), nrow = self.intercepts.shape[0],
+                             ncol = self.intercepts.shape[1])
+        x = self._scores(sample_size)
+        Theta_R = ro.r.matrix(x.numpy(), nrow = x.shape[0], ncol = x.shape[1])
+        ro.r.assign("ldgs", ldgs_R); ro.r.assign("ints", ints_R); ro.r.assign("Theta", Theta_R)
+
+        ro.r("""
+                ldgs = matrix(as.vector(t(ldgs)), nrow = dim(ldgs)[1], byrow = TRUE)
+                ints = cbind(rep(0, dim(ints)[1]), ints)
+                ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
+                Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+
+                Y = simdata(a = ldgs,
+                            d = ints,
+                            itemtype = rep("gpcm", dim(ints)[1]),
+                            Theta = Theta
+                           )
+             """)
+    
+        return torch.from_numpy(ro.r["Y"])
 
         
 class PoissonFactorModelSimulator(BaseFactorModelSimulator):
@@ -33,17 +145,17 @@ class PoissonFactorModelSimulator(BaseFactorModelSimulator):
                  loadings:   torch.Tensor,
                  intercepts: torch.Tensor,
                  cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
                 ):
-        """ Simulate from a Poisson factor model."""
-        super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
+        """ Simulate from the Poisson factor model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: int):
-        latent_size = self.loadings.shape[1]
-        x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
-                                           covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size]).squeeze(dim = -2)
+               sample_size: Optional[int] = None,
+              ):
+        x = self._scores(sample_size)
         rate = F.linear(x, self.loadings, self.intercepts).exp()
         
         y_dist = pydist.Poisson(rate = rate)
@@ -56,20 +168,19 @@ class NegativeBinomialFactorModelSimulator(BaseFactorModelSimulator):
                  loadings:   torch.Tensor,
                  intercepts: torch.Tensor,
                  cov_mat:    torch.Tensor,
-                 probs:      torch.Tensor,
+                 mean:       torch.Tensor,
                 ):
-        """Simulate from a negative binomial factor model."""
-        super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
+        """Simulate from the negative binomial factor model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
         
         self.probs = probs
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: int):
-        latent_size = self.loadings.shape[1]
-        x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
-                                           covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size]).squeeze(dim = -2)
+               sample_size: Optional[int] = None,
+              ):
+        x = self._scores(sample_size)
         total_count = F.linear(x, self.loadings, self.intercepts).exp()
         
         y_dist = pydist.NegativeBinomial(total_count = total_count, probs = self.probs)
@@ -79,23 +190,22 @@ class NegativeBinomialFactorModelSimulator(BaseFactorModelSimulator):
 class NormalFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
-                 loadings:     torch.Tensor,
-                 intercepts:   torch.Tensor,
-                 cov_mat:      torch.Tensor,
-                 residual_std: torch.Tensor
+                 loadings:   torch.Tensor,
+                 intercepts: torch.Tensor,
+                 cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
                 ):
-        """Simulate from a normal factor model."""
-        super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
+        """Simulate from the normal factor model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
         
         self.residual_std = residual_std
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: int):
-        latent_size = self.loadings.shape[1]
-        x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
-                                           covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size]).squeeze(dim = -2)
+               sample_size: Optional[int] = None,
+              ):
+        x = self._scores(sample_size)
         loc = F.linear(x, self.loadings, self.intercepts)
         
         y_dist = pydist.Normal(loc = loc, scale = self.residual_std)
@@ -105,35 +215,50 @@ class NormalFactorModelSimulator(BaseFactorModelSimulator):
 class LogNormalFactorModelSimulator(BaseFactorModelSimulator):
     
     def __init__(self,
-                 loadings:     torch.Tensor,
-                 intercepts:   torch.Tensor,
-                 cov_mat:      torch.Tensor,
-                 residual_std: torch.Tensor
+                 loadings:   torch.Tensor,
+                 intercepts: torch.Tensor,
+                 cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
                 ):
-        """Simulate from a lognormal factor model."""
-        super().__init__(loadings = loadings, intercepts = intercepts, cov_mat = cov_mat)
+        """Simulate from the lognormal factor model."""
+        super().__init__(loadings = loadings, intercepts = intercepts,
+                         cov_mat = cov_mat, mean = mean)
         
         self.residual_std = residual_std
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: int):
-        latent_size = self.loadings.shape[1]
-        x_dist = pydist.MultivariateNormal(loc = torch.zeros([1, latent_size]),
-                                           covariance_matrix = self.cov_mat)
-        x = x_dist.sample([sample_size]).squeeze(dim = -2)
+               sample_size: Optional[int] = None,
+              ):
+        x = self._scores(sample_size)
         loc = F.linear(x, self.loadings, self.intercepts)
         
         y_dist = pydist.LogNormal(loc = loc, scale = self.residual_std)
         return y_dist.sample()
     
     
-SIMULATORS = {"poisson" : PoissonFactorModelSimulator,
-              "negative_binomial" : NegativeBinomialFactorModelSimulator,
-              "normal" : NormalFactorModelSimulator,
-              "lognormal" : LogNormalFactorModelSimulator,
-             }
+class Simulators():
     
+    SIMULATORS = {"grm" : GradedResponseModelSimulator,
+                  "gpcm" : GeneralizedPartialCreditModelSimulator,
+                  "poisson" : PoissonFactorModelSimulator,
+                  "negative_binomial" : NegativeBinomialFactorModelSimulator,
+                  "normal" : NormalFactorModelSimulator,
+                  "lognormal" : LogNormalFactorModelSimulator,
+                 }
+    
+    
+class MixedFactorModelSimulator():
+    
+    def __init__(self,
+                 model_types: List[str],
+                 loadings:    torch.Tensor,
+                 cov_mat:     torch.Tensor,
+                 mean:        torch.Tensor,
+                ):
+        """Simulate from a factor model with mixed item types."""
+        super(MixedFactorModelSimulator, self).__init__()
+        
     
 def simulate_loadings(n_indicators: int,
                       latent_size:  int,
@@ -174,15 +299,36 @@ def simulate_categorical_intercepts(n_items: int,
 def get_covariance_matrix(latent_size: int,
                           cov_type:    str,
                          ):
-    cov_types = ("fixed_variances_no_covariances", "fixed_variances")
+    cov_types = ("fixed_variances_no_covariances", "fixed_variances", "free")
     assert(cov_type in cov_types)
     if cov_type == cov_types[0]:
         cov_mat = torch.eye(latent_size)
     if cov_type == cov_types[1]:
         cov_mat = torch.ones([latent_size, latent_size]).mul(0.3)
         cov_mat.fill_diagonal_(1)
+#    if cov_type == cov_types[2]:
         
     return cov_mat
+
+
+def get_mean(latent_size: int,
+             mean_type: str,
+             sample_size: Optional[int] = None,
+            ):
+    mean_types = ("fixed_means", "latent_regression", "free")
+    assert(mean_type in mean_types)
+    covariates = None; lreg_weight = None
+    if mean_type == mean_types[0]:
+        mean = torch.zeros([1, latent_size])
+    elif mean_type == mean_types[1]:
+        covariates = torch.cat((torch.randn(sample_size, 1),
+                                torch.bernoulli(torch.ones(sample_size, 1) * 0.5)), dim = 1)
+        lreg_weight = pydist.Uniform(-0.5, 0.5).sample([latent_size, 2])
+        mean = F.linear(covariates, lreg_weight)
+    elif mean_type == mean_types[2]:
+        pydist.Uniform(-0.5, 0.5).sample([1, latent_size])
+        
+    return mean, covariates, lreg_weight
 
 
 def get_constraints(latent_size:     int,
@@ -204,46 +350,44 @@ def get_constraints(latent_size:     int,
     return {"Q" : Q, "A" : A, "b" : b}
 
 
-def simulate_and_save_data(model_type:      str,
-                           n_indicators:    int,
-                           latent_size:     int,
-                           cov_type:        str,
-                           sample_size:     int,
-                           expected_dir:    str,
-                           data_dir:        str,
-                           all_same_n_cats: bool = True,
-                          ):
-    """Simulate and save parameters and data for several types of latent factor models."""
-    params = {}
+def simulate_params_and_data(model_type:      str,
+                             n_indicators:    int,
+                             latent_size:     int,
+                             cov_type:        str,
+                             mean_type:       str,
+                             sample_size:     int,
+                             expected_dir:    str,
+                             data_dir:        str,
+                             all_same_n_cats: bool = True,
+                            ):
+    """Simulate parameters and data for several types of latent factor models."""
+    res = {}
     n_items = int(n_indicators * latent_size)
-    params["cov_mat"] = get_covariance_matrix(latent_size, cov_type)
+    res["cov_mat"] = get_covariance_matrix(latent_size, cov_type) # TODO: Add reference indicators
+    res["mean"] = get_mean(latent_size, mean_type, sample_size) # TODO: Add appropriate ints_mask
     
     if model_type in ("grm", "gpcm"):
-        params["ldgs"] = simulate_loadings(n_indicators, latent_size)
+        res["ldgs"] = simulate_loadings(n_indicators, latent_size)
         ints_out = simulate_categorical_intercepts(n_items, all_same_n_cats = all_same_n_cats)
-        params["ints"], params["n_cats"] = ints_out[0], ints_out[1]
+        res["ints"], res["n_cats"] = ints_out[0], ints_out[1]
     else:
         if model_type != "normal":
-            params["ldgs"] = simulate_loadings(n_indicators, latent_size).mul_(0.4)
-            params["ints"] = pydist.Uniform(0.1, 0.5).sample([n_items])
+            res["ldgs"] = simulate_loadings(n_indicators, latent_size).mul_(0.4)
+            res["ints"] = pydist.Uniform(0.1, 0.5).sample([n_items])
             if model_type == "negative_binomial":
-                params["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items])
+                res["probs"] = pydist.Uniform(0.5, 0.7).sample([n_items])
             elif model_type == "lognormal":
-                params["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items])
+                res["residual_std"] = pydist.Uniform(1, 1.2).sample([n_items])
         else:
-            params["ldgs"] = simulate_loadings(n_indicators, latent_size)
-            params["ints"] = torch.randn(n_items).mul(0.1)
-            params["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items])
-    for k, v in params.items():
-        np.savetxt(os.path.join(expected_dir, k + ".csv"), np.asarray(v), delimiter = ",")
+            res["ldgs"] = simulate_loadings(n_indicators, latent_size)
+            res["ints"] = torch.randn(n_items).mul(0.1)
+            res["residual_std"] = pydist.Uniform(0.6, 0.8).sample([n_items])
             
-    if model_type in ("grm", "gpcm"):
-        subprocess.call(["Rscript", "sim_mirt_data.R", model_type, str(sample_size), expected_dir, data_dir])
-    else:
-        sim_kwargs = {k : v for k, v in params.items() if k not in ("ldgs", "ints", "cov_mat")}
-        Y = SIMULATORS[model_type](loadings = params["ldgs"], intercepts = params["ints"],
-                                   cov_mat = params["cov_mat"], **sim_kwargs).sample(sample_size)
-        np.savetxt(os.path.join(data_dir, "data.csv"), Y.numpy(), delimiter = ",")
+    sim_kwargs = {k : v for k, v in res.items() if k not in ("ldgs", "ints", "cov_mat", "n_cats")}
+    res["Y"] = Simulators().SIMULATORS[model_type](loadings = params["ldgs"], intercepts = params["ints"],
+                                                   cov_mat = params["cov_mat"], mean = params["mean"], 
+                                                   **sim_kwargs).sample(sample_size)
+    return res
         
         
 def match_columns(inp_mat: torch.Tensor,
@@ -262,8 +406,3 @@ def match_columns(inp_mat: torch.Tensor,
             cost_mat[ref_col, inp_col] = np.sum((ref_mat[:, ref_col] - inp_mat[:, inp_col])**2)
     
     return torch.from_numpy(inp_mat[:, linear_sum_assignment(cost_mat)[1]])
-
-
-def load_torch_from_csv(name, top_dir):
-    t = np.loadtxt(os.path.join(top_dir, name), delimiter = ",")
-    return torch.from_numpy(t)
