@@ -215,6 +215,13 @@ class IWAVE(BaseEstimator):
             return None
         
     @property
+    def mean(self):
+        try:
+            return self.model.mean.data.cpu()
+        except AttributeError:
+            return None
+        
+    @property
     def latent_regression_weight(self):
         try:
             return self.model.lreg_weight.data.cpu()

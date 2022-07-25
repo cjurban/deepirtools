@@ -33,9 +33,9 @@ class SparseLinear(nn.Module):
         super(SparseLinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
-        self.Q = Q
         
         self.free_weight = nn.Parameter(torch.empty(out_features, in_features))
+        self.register_buffer("Q", Q)
         
         self.reset_parameters()
         
@@ -67,8 +67,8 @@ class LinearConstraints(nn.Module):
         self.out_features = out_features
         
         self.free_weight = nn.Parameter(torch.empty(A.shape[0]))
-        self.A = A
-        self.b = b
+        self.register_buffer("A", A)
+        self.register_buffer("b", b)
         
         self.reset_parameters()
         
@@ -329,7 +329,7 @@ class NonGradedBaseModel(nn.Module):
             assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."
             assert(((ints_mask == 0) + (ints_mask == 1)).all()), "ints_mask must only contain ones and zeros."
         self._bias = nn.Parameter(torch.empty(n_items))
-        self.ints_mask = ints_mask
+        self.register_buffer("ints_mask", ints_mask)
         
         self._reset_parameters()
         
@@ -559,12 +559,12 @@ class MixedFactorModel(nn.Module):
             
         sorted_idxs, sorted_model_types = zip(*sorted(enumerate(model_types), key = itemgetter(1)))
         n_items_per_model = [len(list(g)) for k, g in itertools.groupby(sorted_model_types)]
-        self.cum_idxs = torch.Tensor([0] + n_items_per_model).cumsum(dim  = 0).long()
-        self.sorted_idxs = torch.Tensor(sorted_idxs).long()
+        self.register_buffer("cum_idxs", torch.Tensor([0] + n_items_per_model).cumsum(dim  = 0).long())
+        self.register_buffer("sorted_idxs", torch.Tensor(sorted_idxs).long())
         
         unsorted_idxs = torch.zeros(n_items).long()
         unsorted_idxs[self.sorted_idxs] = torch.arange(n_items)
-        self.unsorted_idxs = unsorted_idxs
+        self.register_buffer("unsorted_idxs", unsorted_idxs)
             
         assert(not (Q is not None and (A is not None or b is not None))), "Q and (A, b) may not be specified at the same time."
         if Q is not None:
@@ -604,7 +604,7 @@ class MixedFactorModel(nn.Module):
                 model_kwargs = {"n_items" : (idx2 - idx1).item()}
             models.append(_models[model_idx](latent_size = max(1, keep_idx.sum().item()),
                                              ints_mask = _ints_mask, _no_loadings = True, **model_kwargs))
-            self.keep_idxs = keep_idxs
+            self.register_buffer("keep_idxs", torch.stack(keep_idxs, dim = 0))
             self.models = nn.ModuleList(models)
             
             self.reset_parameters()
@@ -724,8 +724,8 @@ class Spherical(nn.Module):
             
             tril_idxs = torch.tril_indices(row = size - 1, col = size - 1, offset = 0)
             uncorrelated_factors = [factor for factor in [i for i in range(size)] if factor not in correlated_factors]
-            self.uncorrelated_tril_idxs = tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
-                                                           factor in uncorrelated_factors) > 0]
+            self.register_buffer("uncorrelated_tril_idxs", tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
+                                                                     factor in uncorrelated_factors) > 0])
             
     def cart2spher(self, cart_mat):
         n = cart_mat.size(1)
@@ -824,6 +824,7 @@ class VariationalAutoencoder(nn.Module):
                  latent_size:           int,
                  inference_net_sizes:   List[int] = [100],
                  fixed_variances:       bool = True,
+                 fixed_means:           bool = True,
                  correlated_factors:    List[int] = [],
                  covariate_size:        int = 0,
                  use_spline_prior:      bool = False,
@@ -840,6 +841,7 @@ class VariationalAutoencoder(nn.Module):
                                                    has inference_net_sizes = [100, 100]
             latent_size         (int):         Number of latent variables.
             fixed_variances     (bool):        Whether to constrain latent variances to one.
+            fixed_means         (bool):        Whether to constrain latent means to zero.
             correlated_factors  (List of int): Which latent variables should be correlated.
             covariate_size      (int):         Number of covariates for latent regression.
             use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
@@ -878,8 +880,13 @@ class VariationalAutoencoder(nn.Module):
                 self.flow3 = T.spline_coupling(latent_size, **spline_kwargs)
         else:
             self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors)
+            if not fixed_means:
+                self.mean = nn.Parameter(torch.empty([1, latent_size]))
+            else:
+                self.register_buffer("mean", torch.zeros([1, latent_size]))
         self.latent_size = latent_size
         self.fixed_variances = fixed_variances
+        self.fixed_means = fixed_means
         self.use_spline_prior = use_spline_prior
         
         self.reset_parameters()
@@ -889,13 +896,17 @@ class VariationalAutoencoder(nn.Module):
         nn.init.normal_(self.inf_net.layers[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net.layers[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
         
+        if not self.fixed_means:
+            nn.init.normal_(self.mean, mean=0., std=0.001)
+        
         if self.cov_size > 0:
             nn.init.normal_(self.lreg_weight, mean=0., std=0.001)
         
         if self.use_spline_prior:
             device = self.inf_net.layers[0].weight.device
             params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
-            optimizer = Adam([{"params" : itertools.chain(*params)}], lr = 1e-3, amsgrad = True)
+            lr = (0.1 / (self.latent_size + 1))*5**-1
+            optimizer = Adam([{"params" : itertools.chain(*params)}], lr = lr, amsgrad = True)
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
@@ -974,9 +985,14 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
             flow = self.__get_flow()
             if self.fixed_variances:
-                x_mean = x.mean(dim = -2, keepdim = True)
-                x_dispersion = x.var(dim = -2, keepdim = True).add(EPS).sqrt().pow(-1)
-                flow.append(T.AffineTransform(loc = -x_mean * x_dispersion, scale = x_dispersion))
+                scale = x.var(dim = -2, keepdim = True).add(EPS).sqrt().pow(-1)
+            else:
+                scale = torch.ones_like(x, device = x.device)
+            if self.fixed_means:
+                loc = -x.mean(dim = -2, keepdim = True) * scale
+            else:
+                loc = torch.zeros_like(x, device = x.device)
+            flow.append(T.AffineTransform(loc = loc, scale = scale))
             px = pydist.TransformedDistribution(base_dist, flow)
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
@@ -984,6 +1000,8 @@ class VariationalAutoencoder(nn.Module):
                 loc = F.linear(covariates, self.lreg_weight)
             else:
                 loc = torch.zeros_like(x, device = x.device)
+            if not self.fixed_means:
+                loc.add_(self.mean)
             if self.cholesky.correlated_factors != []:
                 log_px = pydist.MultivariateNormal(loc, scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
             else:
