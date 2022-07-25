@@ -47,6 +47,12 @@ def _test_args():
            ]
 
 
+# TODO: Test the following:
+#           - Mixed item types
+#           - Unconstrained factor means + masked intercepts
+#           - Unconstrained variances + reference indicator
+#           - Recovery of residual stds. + probs.
+#           - GPU
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
                           "cov_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,

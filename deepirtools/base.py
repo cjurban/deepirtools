@@ -31,7 +31,7 @@ class BaseEstimator():
         self.verbose = verbose
 
         self.global_iter = 0
-        self.checker = ConvergenceChecker(log_interval = log_interval)
+        self.checker = ConvergenceChecker(log_interval = log_interval) # TODO: Let user set n_intervals
         
         self.model = None
         self.optimizer = None
