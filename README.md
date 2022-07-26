@@ -135,7 +135,7 @@ BibTeX entries for LaTeX users are:
 title = {{D}eep{IRT}ools: {D}eep learning-based estimation and inference for item response theory models},
      author = {Urban, Christopher J. and He, Shara},
      year = {2022},
-     note = {Python package version 1.0.0},
+     note = {Python package},
      url = {https://github.com/cjurban/deepirtools},
 }
 ```
