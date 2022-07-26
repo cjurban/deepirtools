@@ -18,8 +18,6 @@ from sim_utils import (simulate_and_save_data,
 
 
 ABS_TOL = 0.1
-EXPECTED_DIR = "expected"
-DATA_DIR = "data"
 
 utils = ro.packages.importr("utils")
 utils.chooseCRANmirror(ind = 1)
@@ -51,15 +49,14 @@ def _test_args():
                               )
     return [["_".join((str(i) for i in idx))] + [p for p in prod] for
             idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
-                                       (prod[1] not in ("grm", "gpcm") and not prod[4])
+                                       (prod[1] not in ("grm", "gpcm") and not prod[5]) or
+                                       (prod[0] != "linear" and prod[3] == "free")
                                       )
            ]
 
 
 # TODO: Test the following:
 #           - Mixed item types
-#           - Unconstrained factor means + masked intercepts
-#           - Unconstrained variances + reference indicator
 #           - Recovery of residual stds. + probs.
 #           - GPU
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
@@ -74,13 +71,8 @@ def test_param_recovery(idx:             str,
                         device:          str,
                        ):
     """Test parameter recovery for I-WAVE."""
-    expected_dir = os.path.join(EXPECTED_DIR, "test_" + idx)
-    data_dir = os.path.join(DATA_DIR,  "test_" + idx)
-    os.makedirs(expected_dir, exist_ok = True)
-    os.makedirs(data_dir, exist_ok = True)
-    
-    simulate_and_save_data(model_type, n_indicators, latent_size, cov_type, mean_type,
-                           sample_size, expected_dir, data_dir, all_same_n_cats)
+    simulate_params_and_data(model_type, n_indicators, latent_size, cov_type, mean_type,
+                            sample_size, all_same_n_cats)
     exp_ldgs, exp_ints, exp_cov_mat = (load_torch_from_csv(k + ".csv", expected_dir) for
                                        k in ("ldgs", "ints", "cov_mat"))
     if latent_size == 1:
