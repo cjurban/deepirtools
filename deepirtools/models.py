@@ -98,14 +98,15 @@ class CategoricalBias(nn.Module):
         n_items = len(n_cats)
         
         if mask is None:
-            mask = torch.ones([n_items, 1])
+            mask = torch.ones([n_items])
+            
         bias_list = []
         for i, n_cat in enumerate(n_cats):
             thresholds = get_thresholds([mask[i].item() * -4, 4], n_cat)
             bias_list.append(F.pad(thresholds, (0, M - n_cat),
                                    value = float("inf"))) # Inf. saturates exponentials.
         self._bias = nn.Parameter(torch.stack(bias_list, dim = 0))
-        self.register_buffer("mask", torch.cat([mask, torch.ones([n_items, M - 2])], dim = 1))
+        self.register_buffer("mask", torch.cat([mask.unsqueeze(1), torch.ones([n_items, M - 2])], dim = 1))
         
         nan_mask = torch.where(self._bias.isinf(), torch.ones_like(self._bias) * float("nan"),
                                torch.ones_like(self._bias))

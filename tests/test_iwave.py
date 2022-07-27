@@ -42,7 +42,7 @@ def _test_args():
                                ["grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal", "mixed"],
                                [1, 5],
                                ["fixed_variances_no_covariances", "fixed_variances", "free"],
-                               ["fixed_means", "latent_regression", "free"]
+                               ["fixed_means", "latent_regression", "free"],
                                [True, False],
                                devices
                               )
@@ -54,9 +54,6 @@ def _test_args():
            ]
 
 
-# TODO: Test the following:
-#           - Recovery of residual stds. + probs.
-#           - GPU
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
                           "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
