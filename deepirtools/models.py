@@ -115,11 +115,11 @@ class CategoricalBias(nn.Module):
     def forward(self,
                 x: torch.Tensor,
                ):
-        return (self._bias * self.mask) + x
+        return self.bias + x
     
     @property
     def bias(self):
-        bias = (self._bias * self.nan_mask)
+        bias = (self._bias * self.nan_mask * self.mask)
         if bias.shape[1] == 1:
             return bias.squeeze()
         return bias

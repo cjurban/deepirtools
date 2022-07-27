@@ -10,10 +10,10 @@ import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import invert_cov
 from factor_analyzer import Rotator
-from sim_utils import (get_params_and_data,
-                       match_columns,
-                       get_constraints,
-                      )
+from .sim_utils import (get_params_and_data,
+                        match_columns,
+                        get_constraints,
+                       )
 
 
 ABS_TOL = 0.1
