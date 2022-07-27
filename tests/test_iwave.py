@@ -10,9 +10,8 @@ import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import invert_cov
 from factor_analyzer import Rotator
-from sim_utils import (simulate_and_save_data,
+from sim_utils import (get_params_and_data,
                        match_columns,
-                       load_torch_from_csv,
                        get_constraints,
                       )
 
@@ -56,7 +55,6 @@ def _test_args():
 
 
 # TODO: Test the following:
-#           - Mixed item types
 #           - Recovery of residual stds. + probs.
 #           - GPU
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
@@ -71,40 +69,35 @@ def test_param_recovery(idx:             str,
                         device:          str,
                        ):
     """Test parameter recovery for I-WAVE."""
-    simulate_params_and_data(model_type, n_indicators, latent_size, cov_type, mean_type,
-                            sample_size, all_same_n_cats)
-    exp_ldgs, exp_ints, exp_cov_mat = (load_torch_from_csv(k + ".csv", expected_dir) for
-                                       k in ("ldgs", "ints", "cov_mat"))
-    if latent_size == 1:
-        exp_ldgs = exp_ldgs.unsqueeze(1)
-    Y = load_torch_from_csv("data.csv", data_dir)
+    res = get_params_and_data(model_type, n_indicators, latent_size, cov_type, mean_type,
+                              sample_size, all_same_n_cats)
     
-    n_items = Y.shape[1]
+    n_items = res["Y"].shape[1]
     lr = (0.1/(latent_size+1))*5**-1
-    iwave_kwargs = {}
-    if model_type in ("grm", "gpcm"):
+    iwave_kwargs = {"model_type" : res["model_type"]}
+    if model_type in ("grm", "gpcm", "mixed"):
         exp_ints *= -1
-        iwave_kwargs["n_cats"] = np.loadtxt(os.path.join(expected_dir, "n_cats.csv"),
-                                            delimiter = ",").astype(int).tolist()
+        iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-        if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
-            lr *= 1e-2
-    if "fixed_variances" not in cov_type:
+    if (model_type == "lognormal") or ("lognormal" in res["model_type"]): # Lognormal needs a small learning rate for stability.
+        lr *= 1e-2
+    if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
-    if "no_covariances" not in cov_type:
+    if mean_type == "free":
+        iwave_kwargs["fixed_means"] = False
+    if cov_type != "fixed_variances_no_covariances":
         iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
     model = IWAVE(learning_rate = lr,
                   device = device,
-                  model_type = model_type,
                   input_size = n_items,
                   inference_net_sizes = [100],
                   latent_size = latent_size,
                   **{**iwave_kwargs, **constraints},
                   )
-    model.fit(Y, batch_size = 128, iw_samples = 5)
+    model.fit(res["Y"], batch_size = 128, iw_samples = 5)
     
     if latent_size > 1 and constraint_type == "none":
         if cov_type == "fixed_variances_no_covariances":

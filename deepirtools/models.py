@@ -664,7 +664,7 @@ class MixedFactorModel(nn.Module):
                     residual_stds.append(m.residual_std)
                 except AttributeError:
                     residual_stds.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
-            residual_std =  torch.cat(residual_stds, dim = 0)[self.unsorted_idxs]
+            residual_std = torch.cat(residual_stds, dim = 0)[self.unsorted_idxs]
             assert(~residual_std.isnan().all())
             return residual_std
         except AssertionError:
@@ -679,7 +679,7 @@ class MixedFactorModel(nn.Module):
                     logits_list.append(m.logits)
                 except AttributeError:
                     logits_list.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
-            logits =  torch.cat(logits_list, dim = 0)[self.unsorted_idxs]
+            logits = torch.cat(logits_list, dim = 0)[self.unsorted_idxs]
             assert(~logits.isnan().all())
             return logits
         except AssertionError:
