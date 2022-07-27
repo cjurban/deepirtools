@@ -74,17 +74,18 @@ def test_param_recovery(idx:             str,
     
     n_items = res["Y"].shape[1]
     lr = (0.1/(latent_size+1))*5**-1
-    iwave_kwargs = {"model_type" : res["model_type"]}
+    iwave_kwargs = {"model_type" : res["model_type"], "ints_mask" : res["ints_mask"]}
     if model_type in ("grm", "gpcm", "mixed"):
-        exp_ints *= -1
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-    if (model_type == "lognormal") or ("lognormal" in res["model_type"]): # Lognormal needs a small learning rate for stability.
-        lr *= 1e-2
+    if (model_type == "lognormal") or ("lognormal" in res["model_type"]):
+        lr *= 1e-2 # Lognormal needs a small learning rate for stability.
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
-    if mean_type == "free":
+    if mean_type == "latent_regression":
+        iwave_kwargs["covariate_size"] = 2
+    elif mean_type == "free":
         iwave_kwargs["fixed_means"] = False
     if cov_type != "fixed_variances_no_covariances":
         iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
@@ -97,7 +98,10 @@ def test_param_recovery(idx:             str,
                   latent_size = latent_size,
                   **{**iwave_kwargs, **constraints},
                   )
-    model.fit(res["Y"], batch_size = 128, iw_samples = 5)
+    model.fit(res["Y"], covariates = res["covariates"], batch_size = 128, iw_samples = 5)
+    
+    exp_ldgs, exp_ints, exp_cov_mat = res["loadings"], res["intercepts"], res["cov_mat"]
+    exp_res_std, exp_probs = res["residual_std"], res["probs"]
     
     if latent_size > 1 and constraint_type == "none":
         if cov_type == "fixed_variances_no_covariances":
@@ -109,14 +113,25 @@ def test_param_recovery(idx:             str,
     else:
         est_ldgs, est_cov_mat = model.loadings, model.cov
     est_ints = model.intercepts
-    if model_type == "gpcm" and len(exp_ints.shape) == 2:
+    if "gpcm" in res["model_type"] and len(exp_ints.shape) == 2:
         if exp_ints.shape[1] > 1:
-            est_ints = est_ints.cumsum(dim = 1)
+            gpcm_idxs = torch.Tensor([i for i, m in enumerate(sim.model_types) if m == "gpcm"]).long()
+            est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
+    if not exp_res_std.isnan().all():
+        est_res_std = model.residual_std
+    if not exp_probs.isnan().all():
+        exp_probs = model.probs
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
     assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(est_ldgs)
-    assert(ints_err.mean().le(ABS_TOL)), print(est_ints)
+    assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(est_ints)
     if est_cov_mat is not None:
-        cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).abs()
+        cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
         assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(est_cov_mat)
+    if not exp_res_std.isnan().all():
+        res_std_err = est_res_std.add(-exp_res_std).abs()
+        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(est_res_std)
+    if not exp_probs.isnan().all():
+        res_probs = est_probs.add(-exp_probs).abs()
+        assert(res_probs[~res_probs.isnan()].mean().le(ABS_TOL)), print(est_probs)

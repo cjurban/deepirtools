@@ -326,6 +326,8 @@ class MixedFactorModelSimulator(BaseFactorModelSimulator):
         M = max([i.shape[-1]for i in ints])
         ints = torch.cat([F.pad(i, (0, M - i.shape[1]), value = float("nan")) for
                           i in ints], dim = 0)[self.unsorted_idxs]
+        ints = torch.stack([-i if m in ("grm", "gpcm") else i for
+                            m, i in zip(self.model_types, ints)], dim=0)
         return (ints.squeeze() if ints.shape[1] == 1 else ints)
     
     @property
@@ -539,6 +541,7 @@ def get_params_and_data(model_type:      str,
             "residual_std" : sim.residual_std,
             "probs" : sim.probs,
             "n_cats" : sim.n_cats,
+            "ints_mask" : ints_mask,
            }
         
         
