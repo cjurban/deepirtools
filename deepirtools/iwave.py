@@ -217,7 +217,7 @@ class IWAVE(BaseEstimator):
     @property
     def mean(self):
         try:
-            return self.model.mean.data.cpu()
+            return self.model.mean.squeeze().data.cpu()
         except AttributeError:
             return None
         

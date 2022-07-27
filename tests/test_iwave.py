@@ -8,7 +8,10 @@ import rpy2.robjects as ro
 from rpy2.robjects.vectors import StrVector
 import deepirtools
 from deepirtools import IWAVE
-from deepirtools.utils import invert_cov
+from deepirtools.utils import (invert_cov,
+                               invert_mean,
+                               invert_latent_regression_weight,
+                              )
 from factor_analyzer import Rotator
 from .sim_utils import (get_params_and_data,
                         match_columns,
@@ -99,6 +102,7 @@ def test_param_recovery(idx:             str,
     
     exp_ldgs, exp_ints, exp_cov_mat = res["loadings"], res["intercepts"], res["cov_mat"]
     exp_res_std, exp_probs = res["residual_std"], res["probs"]
+    exp_mean, exp_lreg_weight = res["mean"], res["latent_regression_weight"]
     
     if latent_size > 1 and constraint_type == "none":
         if cov_type == "fixed_variances_no_covariances":
@@ -114,10 +118,8 @@ def test_param_recovery(idx:             str,
         if exp_ints.shape[1] > 1:
             gpcm_idxs = torch.Tensor([i for i, m in enumerate(sim.model_types) if m == "gpcm"]).long()
             est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
-    if not exp_res_std.isnan().all():
-        est_res_std = model.residual_std
-    if not exp_probs.isnan().all():
-        exp_probs = model.probs
+    est_res_std, exp_probs = model.residual_std, model.probs
+    mean, est_lreg_weight = model.mean, model.latent_regression_weight
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
@@ -126,9 +128,16 @@ def test_param_recovery(idx:             str,
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
         assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(est_cov_mat)
-    if not exp_res_std.isnan().all():
+    if est_res_std is not None:
         res_std_err = est_res_std.add(-exp_res_std).abs()
         assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(est_res_std)
-    if not exp_probs.isnan().all():
-        res_probs = est_probs.add(-exp_probs).abs()
-        assert(res_probs[~res_probs.isnan()].mean().le(ABS_TOL)), print(est_probs)
+    if est_probs is not None:
+        probs_err = est_probs.add(-exp_probs).abs()
+        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL)), print(est_probs)
+    if est_lreg_weight is not None:
+        lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).abs()
+        assert(lreg_weight_err.mean().le(ABS_TOL)), print(est_lreg_weight)
+    else:
+        mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).abs()
+        assert(mean_err.mean().le(ABS_TOL)), print(est_mean)
+        

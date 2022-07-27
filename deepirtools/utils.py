@@ -76,10 +76,10 @@ def invert_cov(cov: torch.Tensor,
                mat: torch.Tensor,
               ):
     """
-    Flip covariances according to loadings signs.
+    Flip factor covariances according to loadings signs.
     
     Args:
-        cov (Tensor): Covariance matrix.
+        cov (Tensor): Factor covariance matrix.
         mat (Tensor): Loadings matrix.
     """
     assert(len(cov.shape) == 2), "Factor covariance matrix must be 2D."
@@ -91,6 +91,45 @@ def invert_cov(cov: torch.Tensor,
             cov[:, inv_col_idxs] = -cov[:, inv_col_idxs]
             cov[inv_col_idxs, :] = -cov[inv_col_idxs, :]
     return cov
+
+
+
+def invert_mean(mean: torch.Tensor,
+                mat: torch.Tensor,
+               ):
+    """
+    Flip factor means according to loadings signs.
+    
+    Args:
+        mean (Tensor): Factor mean vector.
+        mat (Tensor):  Loadings matrix.
+    """
+    assert(len(mean.shape) == 1), "Factor mean vector must be 1D."
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
+    mean = mean.clone()
+    for col_idx in range(mat.shape[1]):
+        if mat[:, col_idx].sum() < 0:
+            mean[col_idx] = -mean[col_idx]
+    return mean
+
+
+def invert_latent_regression_weight(weight: torch.Tensor,
+                                    mat: torch.Tensor,
+                                   ):
+    """
+    Flip latent regression weights according to loadings signs.
+
+    Args:
+        weight (Tensor): Latent regression weight matrix.
+        mat (Tensor):    Loadings matrix.
+    """
+    assert(len(weight.shape) == 2), "Latent regression weight matrix must be 2D."
+    assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
+    weight = weight.clone()
+    for col_idx in range(mat.shape[1]):
+        if mat[:, col_idx].sum() < 0:
+            weight[col_idx, :] = -weight[col_idx, :]
+    return weight
 
 
 def normalize_loadings(mat: torch.Tensor):

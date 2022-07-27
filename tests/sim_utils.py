@@ -522,9 +522,9 @@ def get_params_and_data(model_type:      str,
                 sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([_n_items])
                 
         if len(sim_kwargs["intercepts"].shape) > 1:
-            sim_kwargs["intercepts"].mul_(torch.cat((torch.ones([_n_items,
-                                                     sim_kwargs["intercepts"].shape[1] - 1]),
-                                                     _ints_mask.unsqueeze(1)), dim = 1))
+            sim_kwargs["intercepts"].mul_(torch.cat((_ints_mask.unsqueeze(1),
+                                                     torch.ones([_n_items, 
+                                                                 sim_kwargs["intercepts"].shape[1] - 1])), dim = 1))
         else:
             sim_kwargs["intercepts"].mul_(_ints_mask)
         sims[u] = Simulators().SIMULATORS[u](**sim_kwargs)
