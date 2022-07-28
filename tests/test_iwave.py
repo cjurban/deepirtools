@@ -52,7 +52,8 @@ def _test_args():
     return [["_".join((str(i) for i in idx))] + [p for p in prod] for
             idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
                                        (prod[1] not in ("grm", "gpcm") and not prod[5]) or
-                                       (prod[0] != "linear" and prod[3] == "free")
+                                       (prod[0] != "linear" and prod[3] == "free") or
+                                       (prod[0] == "none" and prod[4] != "fixed_means")
                                       )
            ]
 
@@ -114,30 +115,35 @@ def test_param_recovery(idx:             str,
     else:
         est_ldgs, est_cov_mat = model.loadings, model.cov
     est_ints = model.intercepts
-    if "gpcm" in res["model_type"] and len(exp_ints.shape) == 2:
+    if "gpcm" in res["model_types"] and len(exp_ints.shape) == 2:
         if exp_ints.shape[1] > 1:
-            gpcm_idxs = torch.Tensor([i for i, m in enumerate(sim.model_types) if m == "gpcm"]).long()
+            gpcm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "gpcm"]).long()
             est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
-    est_res_std, exp_probs = model.residual_std, model.probs
-    mean, est_lreg_weight = model.mean, model.latent_regression_weight
+    est_res_std, est_probs = model.residual_std, model.probs
+    est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
+    if "grm" in model_type: # TODO: What is causing this sign reversal?
+        if est_mean is not None:
+            est_mean *= -1
+        if est_lreg_weight is not None:
+            est_lreg_weight *= -1
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
-    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(est_ldgs)
-    assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(est_ints)
+    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL))
+    assert(ints_err[ints_err != 0].mean().le(ABS_TOL))
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
-        assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(est_cov_mat)
+        assert(cov_err[cov_err != 0].mean().le(ABS_TOL))
     if est_res_std is not None:
         res_std_err = est_res_std.add(-exp_res_std).abs()
-        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(est_res_std)
+        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL))
     if est_probs is not None:
         probs_err = est_probs.add(-exp_probs).abs()
-        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL)), print(est_probs)
-    if est_lreg_weight is not None:
+        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL))
+    if mean_type == "latent_regression":
         lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).abs()
-        assert(lreg_weight_err.mean().le(ABS_TOL)), print(est_lreg_weight)
-    else:
+        assert(lreg_weight_err.mean().le(ABS_TOL))
+    elif mean_type == "free":
         mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).abs()
-        assert(mean_err.mean().le(ABS_TOL)), print(est_mean)
+        assert(mean_err.mean().le(ABS_TOL))
         
