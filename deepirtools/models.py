@@ -219,9 +219,9 @@ class GradedResponseModel(GradedBaseModel):
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
 
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         if loadings is None:
@@ -257,9 +257,9 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
 
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         M = max(self.n_cats)
@@ -379,9 +379,9 @@ class PoissonFactorModel(NonGradedBaseModel):
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
             
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         if loadings is None:
@@ -416,9 +416,9 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
         nn.init.normal_(self.logits, mean=0., std=0.001)
             
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         if loadings is None:
@@ -454,9 +454,9 @@ class NormalFactorModel(NonGradedBaseModel):
         nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
             
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         if loadings is None:
@@ -495,9 +495,9 @@ class LogNormalFactorModel(NonGradedBaseModel):
         nn.init.normal_(self.free_phi, mean=math.log(math.exp(1) - 1), std=0.001)
             
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
         if loadings is None:
@@ -615,9 +615,9 @@ class MixedFactorModel(nn.Module):
             nn.init.xavier_uniform_(self._loadings.weight)
 
     def forward(self,
-                x: torch.Tensor,
-                y: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
                ):
         ldgs_sorted = self._loadings.weight[self.sorted_idxs]
         y_sorted = y[:, self.sorted_idxs]

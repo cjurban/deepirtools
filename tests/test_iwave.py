@@ -42,7 +42,7 @@ def _test_args():
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
     
     prods = enumerated_product(["none", "binary", "linear"],
-                               ["grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal", "mixed"],
+                               ["mixed", "grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal"],
                                [1, 5],
                                ["fixed_variances_no_covariances", "fixed_variances", "free"],
                                ["fixed_means", "latent_regression", "free"],
