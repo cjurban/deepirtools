@@ -121,7 +121,7 @@ def test_param_recovery(idx:             str,
             est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
     est_res_std, est_probs = model.residual_std, model.probs
     est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
-    if model_type == "mixed" and "grm" in res["model_type"]: # GRM sign reversals due to mirt's simdata().
+    if model_type == "mixed" and "grm" in res["model_type"]: # GRM sign reversals are due to mirt's simdata().
         grm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "grm"]).long()
         est_ldgs[grm_idxs] = -est_ldgs[grm_idxs]
     if "grm" == model_type:
@@ -132,21 +132,21 @@ def test_param_recovery(idx:             str,
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
-    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL))
-    assert(ints_err[ints_err != 0].mean().le(ABS_TOL))
+    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(ldgs_err)
+    assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(ints_err)
     if est_cov_mat is not None:
         cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
-        assert(cov_err[cov_err != 0].mean().le(ABS_TOL))
+        assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(cov_err)
     if est_res_std is not None:
         res_std_err = est_res_std.add(-exp_res_std).abs()
-        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL))
+        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(res_std_err)
     if est_probs is not None:
         probs_err = est_probs.add(-exp_probs).abs()
-        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL))
+        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL)), print(probs_err)
     if mean_type == "latent_regression":
         lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).abs()
-        assert(lreg_weight_err.mean().le(ABS_TOL))
+        assert(lreg_weight_err.mean().le(ABS_TOL)), print(lreg_weight_err)
     elif mean_type == "free":
         mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).abs()
-        assert(mean_err.mean().le(ABS_TOL))
+        assert(mean_err.mean().le(ABS_TOL)), print(mean_err)
         
