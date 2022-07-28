@@ -80,8 +80,8 @@ def test_param_recovery(idx:             str,
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-    if (model_type == "lognormal") or ("lognormal" in res["model_type"]):
-        lr *= 1e-2 # Lognormal needs a small learning rate for stability.
+    if model_type == "lognormal":
+        lr *= 0.05 # Lognormal needs a small learning rate for stability.
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
     if mean_type == "latent_regression":
@@ -121,7 +121,10 @@ def test_param_recovery(idx:             str,
             est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
     est_res_std, est_probs = model.residual_std, model.probs
     est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
-    if "grm" in model_type: # TODO: What is causing this sign reversal?
+    if model_type == "mixed" and "grm" in res["model_type"]: # GRM sign reversals due to mirt's simdata().
+        grm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "grm"]).long()
+        est_ldgs[grm_idxs] = -est_ldgs[grm_idxs]
+    if "grm" == model_type:
         if est_mean is not None:
             est_mean *= -1
         if est_lreg_weight is not None:
