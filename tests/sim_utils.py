@@ -511,12 +511,12 @@ def get_params_and_data(model_type:      str,
             sim_kwargs["intercepts"] = get_categorical_intercepts(_n_items, all_same_n_cats)
         else:
             if u != "normal":
-                sim_kwargs["loadings"].mul_(0.4)
-                sim_kwargs["intercepts"] = pydist.Uniform(0.1, 0.5).sample([_n_items])
+                sim_kwargs["loadings"][sim_kwargs["loadings"] != 1].mul_(0.4)
+                sim_kwargs["intercepts"] = pydist.Uniform(0.3, 0.5).sample([_n_items])
                 if u == "negative_binomial":
                     sim_kwargs["probs"] = pydist.Uniform(0.5, 0.7).sample([_n_items])
                 elif u == "lognormal":
-                    sim_kwargs["residual_std"] = pydist.Uniform(1, 1.2).sample([_n_items])
+                    sim_kwargs["residual_std"] = pydist.Uniform(0.1, 0.2).sample([_n_items])
             else:
                 sim_kwargs["intercepts"] = torch.randn(_n_items).mul(0.1)
                 sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([_n_items])

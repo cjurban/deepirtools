@@ -713,20 +713,20 @@ class Spherical(nn.Module):
         if correlated_factors != []:
             assert(max(correlated_factors) <= size - 1), ("correlated_factors may include no values ",
                                                           "larger than {}.".format(size - 1))
+
         self.size = size
         self.fixed_variances = fixed_variances
         self.correlated_factors = correlated_factors
         
-        if self.correlated_factors != []:
-            n_elts = int((size * (size + 1)) / 2)
-            self.theta = nn.Parameter(torch.zeros([n_elts]))
-            diag_idxs = torch.arange(1, size + 1).cumsum(dim = 0) - 1
-            self.theta.data[diag_idxs] = math.log(math.pi / 2)
-            
-            tril_idxs = torch.tril_indices(row = size - 1, col = size - 1, offset = 0)
-            uncorrelated_factors = [factor for factor in [i for i in range(size)] if factor not in correlated_factors]
-            self.register_buffer("uncorrelated_tril_idxs", tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
-                                                                     factor in uncorrelated_factors) > 0])
+        n_elts = int((size * (size + 1)) / 2)
+        self.theta = nn.Parameter(torch.zeros([n_elts]))
+        diag_idxs = torch.arange(1, size + 1).cumsum(dim = 0) - 1
+        self.theta.data[diag_idxs] = math.log(math.pi / 2)
+
+        tril_idxs = torch.tril_indices(row = size - 1, col = size - 1, offset = 0)
+        uncorrelated_factors = [factor for factor in [i for i in range(size)] if factor not in correlated_factors]
+        self.register_buffer("uncorrelated_tril_idxs", tril_idxs[:, sum((tril_idxs[1,:] == factor) + (tril_idxs[0,:] == factor - 1) for
+                                                                 factor in uncorrelated_factors) > 0])
             
     def cart2spher(self, cart_mat):
         n = cart_mat.size(1)
@@ -744,26 +744,23 @@ class Spherical(nn.Module):
         
     @property
     def weight(self):
-        if self.correlated_factors != [] or not self.fixed_variances:
-            tril_idxs = torch.tril_indices(row = self.size, col = self.size, offset = 0)
-            theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
-            theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta
+        tril_idxs = torch.tril_indices(row = self.size, col = self.size, offset = 0)
+        theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
+        theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta
 
-            # Ensure the parameterization is unique.
-            exp_theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
-            exp_theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta.exp()
-            lower_tri_l_mat = (math.pi * exp_theta_mat) / (1 + theta_mat.exp())
-            l_mat = exp_theta_mat.diag().diag_embed() + lower_tri_l_mat.tril(diagonal = -1)
+        # Ensure the parameterization is unique.
+        exp_theta_mat = torch.zeros(self.size, self.size, device=self.theta.device)
+        exp_theta_mat[tril_idxs[0], tril_idxs[1]] = self.theta.exp()
+        lower_tri_l_mat = (math.pi * exp_theta_mat) / (1 + theta_mat.exp())
+        l_mat = exp_theta_mat.diag().diag_embed() + lower_tri_l_mat.tril(diagonal = -1)
 
-            if self.fixed_variances:
-                l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.theta.device)
-            
-            # Constrain specific correlations to zero.
-            l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = math.pi / 2
-        
-            return self.cart2spher(l_mat)
-        else:
-            return torch.eye(self.size, device=self.theta.device)
+        if self.fixed_variances:
+            l_mat[:, 0] = torch.ones(l_mat.size(0), device=self.theta.device)
+
+        # Constrain specific correlations to zero.
+        l_mat[1:, 1:].data[self.uncorrelated_tril_idxs[0], self.uncorrelated_tril_idxs[1]] = math.pi / 2
+
+        return self.cart2spher(l_mat)
 
     def forward(self,
                 x: torch.Tensor
@@ -772,19 +769,13 @@ class Spherical(nn.Module):
     
     @property
     def cov(self):
-        if self.correlated_factors != [] or not self.fixed_variances:
-            weight = self.weight
-            return torch.matmul(weight, weight.t())
-        else:
-            return torch.eye(self.size, device=self.theta.device)
+        weight = self.weight
+        return torch.matmul(weight, weight.t())
     
     @property
     def inv_cov(self):
-        if self.correlated_factors != [] or not self.fixed_variances:
-            return torch.cholesky_solve(torch.eye(self.size, device=self.theta.device),
-                                        self.weight)
-        else:
-            return torch.eye(self.size, device=self.theta.device)
+        return torch.cholesky_solve(torch.eye(self.size, device=self.theta.device),
+                                    self.weight)
         
         
 def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, bound=3.):
@@ -1006,7 +997,7 @@ class VariationalAutoencoder(nn.Module):
             if self.cholesky.correlated_factors != []:
                 log_px = pydist.MultivariateNormal(loc, scale_tril = self.cholesky.weight).log_prob(x).unsqueeze(-1)
             else:
-                log_px = pydist.Normal(loc, torch.ones_like(x, device = x.device)).log_prob(x).sum(dim = -1, keepdim = True)
+                log_px = pydist.Normal(loc, self.cholesky.weight.diag().view(1, -1)).log_prob(x).sum(dim = -1, keepdim = True)
             
         # Log q(x | y, covariates).
         if iw_samples > 1 and grad_estimator == "dreg":

@@ -34,15 +34,15 @@ if torch.cuda.is_available():
     devices.append("cuda")
 
 sample_size = 10000
-n_indicators = 5
+n_indicators = 10
 
 
 def _test_args():
     def enumerated_product(*args):
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
     
-    prods = enumerated_product(["none", "binary", "linear"],
-                               ["mixed", "grm", "gpcm", "poisson", "negative_binomial", "normal", "lognormal"],
+    prods = enumerated_product(["linear", "binary", "none"],
+                               ["mixed", "gpcm", "grm", "lognormal", "negative_binomial", "normal", "poisson"],
                                [1, 5],
                                ["fixed_variances_no_covariances", "fixed_variances", "free"],
                                ["fixed_means", "latent_regression", "free"],
@@ -59,10 +59,10 @@ def _test_args():
            ]
 
 
-#constraint_type = "binary"
-#model_type = "mixed"
-#latent_size = 5
-#cov_type = "fixed_variances_no_covariances"
+#constraint_type = "linear"
+#model_type = "gpcm"
+#latent_size = 1
+#cov_type = "free"
 #mean_type = "fixed_means"
 #all_same_n_cats = True
 #device = "cpu"
@@ -88,17 +88,15 @@ def test_param_recovery(idx:             str,
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-#    if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
-#        lr *= 1e-2
-#    if latent_size == 5 and model_type == "mixed":
-#        lr *= 0.1
+    if "lognormal" in res["model_type"] or model_type == "mixed":
+        lr *= 0.1 # Lognormal and mixed benefit from small learning rates for stability.
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
     if mean_type == "latent_regression":
         iwave_kwargs["covariate_size"] = 2
     elif mean_type == "free":
         iwave_kwargs["fixed_means"] = False
-    if cov_type != "fixed_variances_no_covariances":
+    if latent_size > 1 and cov_type != "fixed_variances_no_covariances":
         iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
@@ -151,4 +149,3 @@ def test_param_recovery(idx:             str,
     elif mean_type == "free":
         mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).abs()
         assert(mean_err.mean().le(ABS_TOL)), print(mean_err)
-        
