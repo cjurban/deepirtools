@@ -591,7 +591,7 @@ class MixedFactorModel(nn.Module):
         keep_idxs = []
         models = []
         for model_idx, (idx1, idx2) in enumerate(zip(self.cum_idxs[:-1], self.cum_idxs[1:])):
-            keep_idx = check_mat[self.sorted_idxs][idx1:idx2].sum(dim = 0).gt(0)
+            keep_idx = check_mat[idx1:idx2].sum(dim = 0).gt(0)
             keep_idxs.append(keep_idx)
             if ints_mask is not None:
                 assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."

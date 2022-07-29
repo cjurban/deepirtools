@@ -53,11 +53,19 @@ def _test_args():
             idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
                                        (prod[1] not in ("grm", "gpcm") and not prod[5]) or
                                        (prod[0] != "linear" and prod[3] == "free") or
+                                       (prod[0] == "linear" and prod[3] != "free") or
                                        (prod[0] == "none" and prod[4] != "fixed_means")
                                       )
            ]
 
 
+#constraint_type = "binary"
+#model_type = "mixed"
+#latent_size = 5
+#cov_type = "fixed_variances_no_covariances"
+#mean_type = "fixed_means"
+#all_same_n_cats = True
+#device = "cpu"
 @pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
                           "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
@@ -80,8 +88,10 @@ def test_param_recovery(idx:             str,
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-    if model_type == "lognormal":
-        lr *= 0.05 # Lognormal needs a small learning rate for stability.
+#    if model_type == "lognormal": # Lognormal needs a small learning rate for stability.
+#        lr *= 1e-2
+#    if latent_size == 5 and model_type == "mixed":
+#        lr *= 0.1
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
     if mean_type == "latent_regression":
@@ -121,14 +131,6 @@ def test_param_recovery(idx:             str,
             est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
     est_res_std, est_probs = model.residual_std, model.probs
     est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
-    if model_type == "mixed" and "grm" in res["model_type"]: # GRM sign reversals are due to mirt's simdata().
-        grm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "grm"]).long()
-        est_ldgs[grm_idxs] = -est_ldgs[grm_idxs]
-    if "grm" == model_type:
-        if est_mean is not None:
-            est_mean *= -1
-        if est_lreg_weight is not None:
-            est_lreg_weight *= -1
     
     ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
     ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()

@@ -53,7 +53,7 @@ class GradedResponseModelSimulator(BaseFactorModelSimulator):
         """ Simulate from Samejima's graded response model."""
         super().__init__(cov_mat = cov_mat, mean = mean)
         
-        self.loadings = loadings
+        self.loadings = -loadings # TODO: Why are there GRM sign reversals?
         self.intercepts = intercepts
         
     @torch.no_grad()    
@@ -315,7 +315,7 @@ class MixedFactorModelSimulator(BaseFactorModelSimulator):
     def loadings(self):
         ldgs = []
         for m in self.unique_model_types:
-            ldgs.append(self.sims[m].loadings)
+            ldgs.append((-self.sims[m].loadings if m == "grm" else self.sims[m].loadings))
         return torch.cat(ldgs, dim = 0)[self.unsorted_idxs]
     
     @property
