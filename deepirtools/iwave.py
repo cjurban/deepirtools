@@ -22,6 +22,7 @@ class IWAVE(BaseEstimator):
                  gradient_estimator:  str = "dreg",
                  log_interval:        int = 100,
                  verbose:             bool = True,
+                 n_intervals:         int = 100,
                  **model_kwargs,
                 ):
         """
@@ -44,9 +45,11 @@ class IWAVE(BaseEstimator):
                                                       "iwae" = standard gradient estimator
             log_interval       (str):             Frequency of updates printed during fitting.
             verbose            (bool):            Whether to print updates during fitting.
+            n_intervals        (str):             Number of 100-batch intervals after which fitting is terminated if
+                                                  best average loss does not improve.
             model_kwargs       (dict):            Named parameters passed to VariationalAutoencoder.__init__().
         """
-        super().__init__(device, log_interval, verbose)
+        super().__init__(device, log_interval, verbose, n_intervals)
         assert(gradient_estimator in GRAD_ESTIMATORS), "gradient_estimator must be one of {}".format(GRAD_ESTIMATORS)
         self.grad_estimator = gradient_estimator
         self.runtime_kwargs["grad_estimator"] = gradient_estimator

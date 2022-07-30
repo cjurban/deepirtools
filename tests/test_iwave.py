@@ -59,6 +59,13 @@ def _test_args():
            ]
 
 
+#constraint_type = "linear"
+#model_type = "gpcm"
+#latent_size = 1
+#cov_type = "free"
+#mean_type = "fixed_means"
+#all_same_n_cats = True
+#device = "cpu"
 @pytest.mark.parametrize(("idx, model_type, constraint_type, latent_size, "
                           "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
@@ -81,8 +88,9 @@ def test_param_recovery(idx:             str,
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-    if "lognormal" in res["model_type"] or model_type == "mixed":
-        lr *= 0.1 # Lognormal and mixed benefit from small learning rates for stability.
+    if (any(m in res["model_type"] for m in ("lognormal", "poisson", "negative_binomial")) or
+        model_type == "mixed"):
+        lr *= 0.1 # Above models benefit from small learning rates for stability.
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
     if mean_type == "latent_regression":

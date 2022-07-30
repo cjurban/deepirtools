@@ -18,6 +18,7 @@ class BaseEstimator():
                  device:                str = "cpu",
                  log_interval:          int = 100,
                  verbose:               bool = True,
+                 n_intervals:           int = 100,
                 ):
         """
         Base class from which other estimation methods inherit.
@@ -26,12 +27,14 @@ class BaseEstimator():
             device       (str):  Computing device used for fitting.
             log_interval (str):  Frequency of updates printed during fitting.
             verbose      (bool): Whether to print updates during fitting.
+            n_intervals  (str):  Number of 100-batch intervals after which fitting is terminated if
+                                 best average loss does not improve.
         """
         self.device = device
         self.verbose = verbose
 
         self.global_iter = 0
-        self.checker = ConvergenceChecker(log_interval = log_interval) # TODO: Let user set n_intervals
+        self.checker = ConvergenceChecker(log_interval = log_interval, n_intervals = n_intervals)
         
         self.model = None
         self.optimizer = None
