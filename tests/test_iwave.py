@@ -34,15 +34,15 @@ if torch.cuda.is_available():
     devices.append("cuda")
 
 sample_size = 10000
-n_indicators = 10
+n_indicators = 5
 
 
 def _test_args():
     def enumerated_product(*args):
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
     
-    prods = enumerated_product(["linear", "binary", "none"],
-                               ["mixed", "gpcm", "grm", "lognormal", "negative_binomial", "normal", "poisson"],
+    prods = enumerated_product(["mixed", "lognormal", "gpcm", "grm", "negative_binomial", "normal", "poisson"],
+                               ["none", "binary", "linear"],
                                [1, 5],
                                ["fixed_variances_no_covariances", "fixed_variances", "free"],
                                ["fixed_means", "latent_regression", "free"],
@@ -51,26 +51,19 @@ def _test_args():
                               )
     return [["_".join((str(i) for i in idx))] + [p for p in prod] for
             idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
-                                       (prod[1] not in ("grm", "gpcm") and not prod[5]) or
-                                       (prod[0] != "linear" and prod[3] == "free") or
-                                       (prod[0] == "linear" and prod[3] != "free") or
-                                       (prod[0] == "none" and prod[4] != "fixed_means")
+                                       (prod[0] not in ("grm", "gpcm") and not prod[5]) or
+                                       (prod[1] != "linear" and prod[3] == "free") or
+                                       (prod[1] == "linear" and prod[3] != "free") or
+                                       (prod[1] == "none" and prod[4] != "fixed_means")
                                       )
            ]
 
 
-#constraint_type = "linear"
-#model_type = "gpcm"
-#latent_size = 1
-#cov_type = "free"
-#mean_type = "fixed_means"
-#all_same_n_cats = True
-#device = "cpu"
-@pytest.mark.parametrize(("idx, constraint_type, model_type, latent_size, "
+@pytest.mark.parametrize(("idx, model_type, constraint_type, latent_size, "
                           "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
-                        constraint_type: str,
                         model_type:      str,
+                        constraint_type: str,
                         latent_size:     int,
                         cov_type:        str,
                         mean_type:       str,
@@ -96,8 +89,9 @@ def test_param_recovery(idx:             str,
         iwave_kwargs["covariate_size"] = 2
     elif mean_type == "free":
         iwave_kwargs["fixed_means"] = False
-    if latent_size > 1 and cov_type != "fixed_variances_no_covariances":
-        iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
+    if constraint_type != "none":
+        if latent_size > 1 and cov_type != "fixed_variances_no_covariances":
+            iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
     model = IWAVE(learning_rate = lr,
@@ -119,7 +113,7 @@ def test_param_recovery(idx:             str,
         elif cov_type == "fixed_variances":
             rotator = Rotator(method = "geomin_obl")
         est_ldgs = torch.from_numpy(rotator.fit_transform(model.loadings.numpy()))
-        est_cov_mat = (torch.from_numpy(rotator.phi_) if cov_type == 1 else None)
+        est_cov_mat = (torch.from_numpy(rotator.phi_) if rotator.phi_ is not None else None)
     else:
         est_ldgs, est_cov_mat = model.loadings, model.cov
     est_ints = model.intercepts
@@ -135,8 +129,10 @@ def test_param_recovery(idx:             str,
     assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(ldgs_err)
     assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(ints_err)
     if est_cov_mat is not None:
-        cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
-        assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(cov_err)
+        if ((latent_size > 1 and cov_type != "fixed_variances_no_covariances") or
+            (latent_size == 1 and cov_type == "free")):
+            cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
+            assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(cov_err)
     if est_res_std is not None:
         res_std_err = est_res_std.add(-exp_res_std).abs()
         assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(res_std_err)
