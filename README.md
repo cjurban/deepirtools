@@ -52,7 +52,7 @@ To install the latest version on GitHub:
 
 ### Quick Example
 
-```
+```python
 In [1]: import deepirtools
    ...: from deepirtools import IWAVE
    ...: import torch
