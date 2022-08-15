@@ -41,7 +41,7 @@ def _test_args():
     def enumerated_product(*args):
         yield from zip(product(*(range(len(x)) for x in args)), product(*args))
     
-    prods = enumerated_product(["mixed", "lognormal", "gpcm", "grm", "negative_binomial", "normal", "poisson"],
+    prods = enumerated_product(["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"],
                                ["none", "binary", "linear"],
                                [1, 5],
                                ["fixed_variances_no_covariances", "fixed_variances", "free"],
@@ -59,13 +59,6 @@ def _test_args():
            ]
 
 
-#constraint_type = "linear"
-#model_type = "gpcm"
-#latent_size = 1
-#cov_type = "free"
-#mean_type = "fixed_means"
-#all_same_n_cats = True
-#device = "cpu"
 @pytest.mark.parametrize(("idx, model_type, constraint_type, latent_size, "
                           "cov_type, mean_type, all_same_n_cats, device"), _test_args())
 def test_param_recovery(idx:             str,
@@ -82,15 +75,14 @@ def test_param_recovery(idx:             str,
                               sample_size, all_same_n_cats)
     
     n_items = res["Y"].shape[1]
-    lr = (0.1/(latent_size+1))*5**-1
+#    lr = (0.1/(latent_size+1))*5**-1
     iwave_kwargs = {"model_type" : res["model_type"], "ints_mask" : res["ints_mask"]}
     if model_type in ("grm", "gpcm", "mixed"):
         iwave_kwargs["n_cats"] = res["n_cats"]
     else:
         iwave_kwargs["n_items"] = n_items
-    if (any(m in res["model_type"] for m in ("lognormal", "poisson", "negative_binomial")) or
-        model_type == "mixed"):
-        lr *= 0.1 # Above models benefit from small learning rates for stability.
+#    if model_type in ("lognormal", "mixed"):
+#        lr *= 0.1 # Above models benefit from small learning rates for stability.
     if cov_type == "free":
         iwave_kwargs["fixed_variances"] = False
     if mean_type == "latent_regression":
@@ -102,7 +94,7 @@ def test_param_recovery(idx:             str,
             iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
-    model = IWAVE(learning_rate = lr,
+    model = IWAVE(#learning_rate = lr,
                   device = device,
                   input_size = n_items,
                   inference_net_sizes = [100],
