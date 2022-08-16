@@ -10,6 +10,7 @@ from itertools import chain
 
 def manual_seed(seed: int):
     """Set random seed to ensure reproducible results."""
+    
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -61,9 +62,12 @@ def invert_factors(mat: torch.Tensor):
     """
     For each factor, flip sign if sum of loadings is negative.
     
-    Args:
-        mat (Tensor): Loadings matrix.
+    Parameters
+    __________
+        mat : Tensor
+            Loadings matrix.
     """
+    
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     mat = mat.clone()
     for col_idx in range(mat.shape[1]): 
@@ -78,10 +82,14 @@ def invert_cov(cov: torch.Tensor,
     """
     Flip factor covariances according to loadings signs.
     
-    Args:
-        cov (Tensor): Factor covariance matrix.
-        mat (Tensor): Loadings matrix.
+    Parameters
+    __________
+        cov : Tensor
+            Factor covariance matrix.
+        mat : Tensor
+            Loadings matrix.
     """
+    
     assert(len(cov.shape) == 2), "Factor covariance matrix must be 2D."
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     cov = cov.clone()
@@ -100,10 +108,14 @@ def invert_mean(mean: torch.Tensor,
     """
     Flip factor means according to loadings signs.
     
-    Args:
-        mean (Tensor): Factor mean vector.
-        mat (Tensor):  Loadings matrix.
+    Parameters
+    __________
+        mean : Tensor
+            Factor mean vector.
+        mat : Tensor
+            Loadings matrix.
     """
+    
     assert(len(mean.shape) == 1), "Factor mean vector must be 1D."
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     mean = mean.clone()
@@ -119,10 +131,14 @@ def invert_latent_regression_weight(weight: torch.Tensor,
     """
     Flip latent regression weights according to loadings signs.
 
-    Args:
-        weight (Tensor): Latent regression weight matrix.
-        mat (Tensor):    Loadings matrix.
+    Parameters
+    __________
+        weight : Tensor
+            Latent regression weight matrix.
+        mat : Tensor
+            Loadings matrix.
     """
+    
     assert(len(weight.shape) == 2), "Latent regression weight matrix must be 2D."
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     weight = weight.clone()
@@ -136,9 +152,12 @@ def normalize_loadings(mat: torch.Tensor):
     """
     Convert loadings to normal ogive metric (only for IRT models).
     
-    Args:
-        mat (Tensor): Loadings matrix.
+    Parameters
+    __________
+        mat : Tensor
+            Loadings matrix.
     """
+    
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     mat = mat.clone().div(1.702)
     scale_const = mat.pow(2).sum(dim = 1).add(1).sqrt()
@@ -152,11 +171,16 @@ def normalize_ints(ints:   torch.Tensor,
     """
     Convert intercepts to normal ogive metric (only for IRT models).
     
-    Args:
-        ints   (Tensor):      Intercepts vector.
-        mat    (Tensor):      Loadings matrix.
-        n_cats (List of int): Number of categories for each item.
+    Parameters
+    __________
+        ints : Tensor
+            Intercepts vector.
+        mat : Tensor
+            Loadings matrix.
+        n_cats : list of int
+            Number of categories for each item.
     """
+    
     assert(len(ints.shape) == 1), "Intercepts vector must be 1D."
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
     ints = ints.clone()

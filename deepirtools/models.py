@@ -133,6 +133,7 @@ class CategoricalBias(nn.Module):
     
 
 class GradedBaseModel(nn.Module):
+    """Base model for graded responses."""
     
     def __init__(self,
                  latent_size:  int,
@@ -143,13 +144,6 @@ class GradedBaseModel(nn.Module):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """
-        Base model for graded responses.
-        
-        Args:
-            n_cats      (List of int): Number of categories for each item.
-            _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
-        """
         super(GradedBaseModel, self).__init__()
         
         if not _no_loadings:
@@ -199,6 +193,7 @@ class GradedBaseModel(nn.Module):
     
     
 class GradedResponseModel(GradedBaseModel):
+    """Samejima's graded response model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -209,7 +204,6 @@ class GradedResponseModel(GradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Samejima's graded response model."""
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
 
@@ -237,6 +231,7 @@ class GradedResponseModel(GradedBaseModel):
     
     
 class GeneralizedPartialCreditModel(GradedBaseModel):
+    """Generalized partial credit model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -247,7 +242,6 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Generalized partial credit model."""
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
 
@@ -280,6 +274,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
     
     
 class NonGradedBaseModel(nn.Module):
+    """Base model for non-graded responses."""
     
     def __init__(self,
                  latent_size:  int,
@@ -290,13 +285,6 @@ class NonGradedBaseModel(nn.Module):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """
-        Base model for non-graded responses.
-        
-        Args:
-            n_items     (int):         Number of items.
-            _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
-        """
         super(NonGradedBaseModel, self).__init__()
         
         if not _no_loadings:
@@ -332,6 +320,7 @@ class NonGradedBaseModel(nn.Module):
         
     def forward(self):
         """Compute log p(data | latents)."""
+        
         raise NotImplementedError
         
     @property
@@ -354,6 +343,7 @@ class NonGradedBaseModel(nn.Module):
     
     
 class PoissonFactorModel(NonGradedBaseModel):
+    """Poisson factor model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -364,7 +354,6 @@ class PoissonFactorModel(NonGradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Poisson factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
             
@@ -386,6 +375,7 @@ class PoissonFactorModel(NonGradedBaseModel):
     
     
 class NegativeBinomialFactorModel(NonGradedBaseModel):
+    """Negative binomial factor model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -396,7 +386,6 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Negative binomial factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
         
@@ -426,6 +415,7 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
     
     
 class NormalFactorModel(NonGradedBaseModel):
+    """Normal (linear) factor model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -436,7 +426,6 @@ class NormalFactorModel(NonGradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Normal (linear) factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
         
@@ -467,6 +456,7 @@ class NormalFactorModel(NonGradedBaseModel):
 
     
 class LogNormalFactorModel(NonGradedBaseModel):
+    """Lognormal factor model."""
     
     def __init__(self,
                  latent_size:  int,
@@ -477,7 +467,6 @@ class LogNormalFactorModel(NonGradedBaseModel):
                  ints_mask:    Optional[torch.Tensor] = None,
                  _no_loadings: bool = False,
                 ):
-        """Lognormal factor model."""
         super().__init__(latent_size = latent_size, n_items = n_items, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
         
@@ -519,6 +508,7 @@ class ModelTypes():
     
     
 class MixedFactorModel(nn.Module):
+    """Factor model with mixed item types."""
     
     def __init__(self,
                  latent_size: int,
@@ -530,19 +520,6 @@ class MixedFactorModel(nn.Module):
                  b:           Optional[torch.Tensor] = None,
                  ints_mask:   Optional[torch.Tensor] = None,
                 ):
-        """
-        Factor model with mixed item types.
-                
-        Args:
-            latent_size (int):              Number of latent variables.
-            model_types (List of str):      Model type for each item.
-            n_cats      (List of int/None): Number of categories for each item. Continuous items and counts
-                                            are indicated with None.
-                                                E.g., if items 1-2 have are categorical w/ 3 categories, item 3
-                                                is continuous, and item 4 is categorical w/ 2 categories, set
-                                                n_cats = [3, 3, None, 2]
-            n_items     (int):              Number of items. Does not need to be specified if n_cats is given.
-        """
         super(MixedFactorModel, self).__init__()
         assert(not (n_items is None and n_cats is None)), "Must define either n_items or n_cats."
         if n_items is None:
