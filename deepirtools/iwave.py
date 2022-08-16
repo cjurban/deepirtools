@@ -89,6 +89,54 @@ class IWAVE(BaseEstimator):
                   "negative_binomial" : negative binomial factor model
                   "normal" : normal factor model
                   "lognormal" : lognormal factor model
+            latent_size : int
+                Number of latent factors.
+            n_cats : list of int and None, optional
+                Number of response categories for each item.
+                
+                Only needed if some items are categorical. Any continuous items or counts are indicated
+                with None.
+                
+                For example, setting n_cats = [3, 3, None, 2] indicates that items 1-2 are categorical
+                with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
+            n_items : int, optional
+                Number of items.
+                
+                Only specified if all items are continuous. Not needed if n_cats is specified instead.
+            inference_net_sizes : list of int, default = [100]
+                Neural network inference model hidden layer dimensions.
+                
+                For example, setting inference_net_sizes = [100, 100] creates a neural network
+                inference model with two hidden layers of size 100.
+            fixed_variances : bool, default = True
+                Whether to constrain variances of latent factors to one.
+            fixed_means : bool, default = True
+                Whether to constrain means of latent factors to zero.
+            correlated_factors : list of int, default = []
+                Which latent factors should be correlated.
+                
+                For example, setting correlated_factors = [0, 3, 4] in a model with 5 latent
+                factors models the correlations between the first, fourth, and fifth factors
+                while constraining the other correlations to zero.
+            covariate_size : int, default = None
+                Number of covariates for latent regression.
+            Q : Tensor, default = None
+                Binary matrix indicating measurement structure.
+                
+                
+            A : Tensor, default = None
+                Matrix imposing linear constraints on loadings.
+                
+                
+            b : Tensor, default = None
+                Vector imposing linear constraints on loadings.
+                
+                
+            ints_mask : Tensor, default = None
+                Vector constraining specific intercepts to zero.
+                
+                A length J vector where J is the number of items. If some items are categorical,
+                only the smallest category intercept may be constrained to zero.
             learning_rate : float, default = 1e-3
                 Step size for stochastic gradient optimizer.
                 
@@ -117,8 +165,12 @@ class IWAVE(BaseEstimator):
             n_intervals : str, default = 100
                 Number of 100-mini-batch intervals after which fitting is terminated if best average
                 loss does not improve.
-            **model_kwargs # TODO: Specify these.
-                Keyword arguments passed to VariationalAutoencoder.__init__().
+            use_spline_prior : bool, default = False
+                Whether to use spline/spline coupling prior.
+            count_bins : int, optional
+                Number of segments for each spline transformation.
+            bound : float, optional
+                Quantity determining the bounding box of each spline transformation.
         """
         
         super().__init__(device, log_interval, verbose, n_intervals)

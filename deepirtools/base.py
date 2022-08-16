@@ -157,8 +157,14 @@ class BaseEstimator():
             max_epochs : int, default = 100000
                 Number of passes through the full data set after which fitting should be
                 terminated if convergence not achieved.
-            **model_kwargs # TODO: Specify these.
-                Keyword arguments passed to self.model.forward().
+            mc_samples : int, default = 1
+                Number of Monte Carlo samples.
+                
+                Increasing this decreases the log-likelihood estimator's variance.
+            iw_samples : int, default = 5000
+                Number of importance-weighted samples.
+                
+                Increasing this decreases the log-likelihood estimator's bias.
         """
         
         if self.verbose:

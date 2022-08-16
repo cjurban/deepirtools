@@ -23,13 +23,13 @@ import logging
 
 
 class SparseLinear(nn.Module):
+    """Linear map with binary constraints."""
     
     def __init__(self,
                  in_features:  int,
                  out_features: int,
                  Q:            torch.Tensor,
                 ):
-        """Linear map with binary constraints."""
         super(SparseLinear, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -54,6 +54,7 @@ class SparseLinear(nn.Module):
     
     
 class LinearConstraints(nn.Module):
+    """Linear map with linear constraints."""
     
     def __init__(self,
                  in_features:  int,
@@ -61,7 +62,6 @@ class LinearConstraints(nn.Module):
                  A:            torch.Tensor,
                  b:            Optional[torch.Tensor] = None,
                 ):
-        """Linear map with linear constraints."""
         super(LinearConstraints, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -86,12 +86,12 @@ class LinearConstraints(nn.Module):
 
 
 class CategoricalBias(nn.Module):
+    """Biases (i.e., intercepts) for categorical response models."""
     
     def __init__(self,
                  n_cats: List[int],
                  ints_mask: Optional[torch.Tensor] = None,
                 ):
-        """Biases (i.e., intercepts) for categorical response models."""
         super(CategoricalBias, self).__init__()
         self.n_cats = n_cats
         M = max(n_cats)
@@ -147,12 +147,7 @@ class GradedBaseModel(nn.Module):
         Base model for graded responses.
         
         Args:
-            latent_size (int):         Number of latent variables.
             n_cats      (List of int): Number of categories for each item.
-            Q           (Tensor):      Binary matrix indicating measurement structure.
-            A           (Tensor):      Matrix imposing linear constraints on loadings.
-            b           (Tensor):      Vector imposing linear constraints on loadings.
-            ints_mask   (Tensor):      Vector constraining first intercepts to zero.
             _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
         """
         super(GradedBaseModel, self).__init__()
@@ -299,12 +294,7 @@ class NonGradedBaseModel(nn.Module):
         Base model for non-graded responses.
         
         Args:
-            latent_size (int):         Number of latent variables.
             n_items     (int):         Number of items.
-            Q           (Tensor):      Binary matrix indicating measurement structure.
-            A           (Tensor):      Matrix imposing linear constraints on loadings.
-            b           (Tensor):      Vector imposing linear constraints on loadings.
-            ints_mask   (Tensor):      Vector constraining specific intercepts to zero.
             _no_loadings (bool):       Whether to define loadings matrix or take as input to forward().
         """
         super(NonGradedBaseModel, self).__init__()
@@ -552,10 +542,6 @@ class MixedFactorModel(nn.Module):
                                                 is continuous, and item 4 is categorical w/ 2 categories, set
                                                 n_cats = [3, 3, None, 2]
             n_items     (int):              Number of items. Does not need to be specified if n_cats is given.
-            Q           (Tensor):           Binary matrix indicating measurement structure.
-            A           (Tensor):           Matrix imposing linear constraints on loadings.
-            b           (Tensor):           Vector imposing linear constraints on loadings.
-            ints_mask   (Tensor):           Vector constraining specific intercepts to zero.
         """
         super(MixedFactorModel, self).__init__()
         assert(not (n_items is None and n_cats is None)), "Must define either n_items or n_cats."
@@ -699,20 +685,13 @@ class MixedFactorModel(nn.Module):
     
 
 class Spherical(nn.Module):
+    """Spherical parameterization of a covariance matrix."""
     
     def __init__(self,
                  size:               int,
                  fixed_variances:    bool,
                  correlated_factors: List[int],
                 ):
-        """
-        Spherical parameterization of a covariance matrix.
-        
-        Args:
-            size               (int):         Number of correlated variables.
-            fixed_variances    (bool):        Whether to fix variances to one.
-            correlated_factors (List of int): Which variables should be correlated.
-        """
         super(Spherical, self).__init__()
         if correlated_factors != []:
             assert(max(correlated_factors) <= size - 1), ("correlated_factors may include no values ",
@@ -796,6 +775,7 @@ class Spherical(nn.Module):
         
 def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, bound=3.):
     """Modification of Pyro's spline_coupling() to use ELU activations."""
+    
     if split_dim is None:
         split_dim = input_dim // 2
 
@@ -814,7 +794,7 @@ def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, b
         nonlinearity=nn.ELU(),
     )
 
-    return T.SplineCoupling(input_dim, split_dim, net, count_bins, bound)
+    return T.SplineCoupling(input_dim, split_dim, net, count_bins, bound, order = "quadratic")
 
         
 ################################################################################
@@ -825,10 +805,10 @@ def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, b
         
     
 class VariationalAutoencoder(nn.Module):
+    """Variational autoencoder with an interchangeable measurement model (i.e., decoder)."""
     
     def __init__(self,
                  decoder,
-                 input_size:            int,
                  latent_size:           int,
                  inference_net_sizes:   List[int] = [100],
                  fixed_variances:       bool = True,
@@ -838,34 +818,20 @@ class VariationalAutoencoder(nn.Module):
                  use_spline_prior:      bool = False,
                  **kwargs,
                 ):
-        """
-        Variational autoencoder with an interchangeable measurement model (i.e., decoder).
-        
-        Args:
-            decoder             (nn.Module):   Measurement model whose forward() method returns log p(data | latents).
-            input_size          (int):         Neural network input dimension.
-            inference_net_sizes (List of int): Neural network hidden layer dimensions.
-                                                   E.g., a neural network with two hidden layers of size 100
-                                                   has inference_net_sizes = [100, 100]
-            latent_size         (int):         Number of latent variables.
-            fixed_variances     (bool):        Whether to constrain latent variances to one.
-            fixed_means         (bool):        Whether to constrain latent means to zero.
-            correlated_factors  (List of int): Which latent variables should be correlated.
-            covariate_size      (int):         Number of covariates for latent regression.
-            use_spline_prior    (bool):        Whether to use spline/spline coupling prior.
-            kwargs              (dict):        Named parameters passed to decoder.__init__() and
-                                               rational linear spline parameters passed to spline_coupling().
-        """
         super(VariationalAutoencoder, self).__init__()
-        
-        # Inference model neural network.
-        self.inf_net = DenseNN(input_size + covariate_size, inference_net_sizes,
-                               [int(2 * latent_size)], nonlinearity = nn.ELU())
                 
         # Measurement model.
         decoder_args = list(inspect.signature(decoder).parameters)
         decoder_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in decoder_args}
         self.decoder = decoder(latent_size=latent_size, **decoder_kwargs)
+        
+        # Inference model neural network.
+        try:
+            input_size = len(decoder_kwargs["n_cats"])
+        except KeyError:
+            input_size = decoder_kwargs["n_items"]
+        self.inf_net = DenseNN(input_size + covariate_size, inference_net_sizes,
+                               [int(2 * latent_size)], nonlinearity = nn.ELU())
         
         # Latent regression.
         if covariate_size > 0:
@@ -881,7 +847,7 @@ class VariationalAutoencoder(nn.Module):
         assert(len(kwargs) == 0), "Unused arguments: " + ", ".join([k for k in kwargs])
         if use_spline_prior:
             if latent_size == 1:
-                self.flow = T.Spline(1, **spline_kwargs)
+                self.flow = T.Spline(1, order = "quadratic", **spline_kwargs)
             else:
                 self.flow1 = T.spline_coupling(latent_size, **spline_kwargs)
                 self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
@@ -940,6 +906,7 @@ class VariationalAutoencoder(nn.Module):
                iw_samples: int,
               ):
         """Sample approximate latent variable posterior."""
+        
         hidden = self.inf_net(y)
 
         # Monte Carlo samples.
@@ -961,19 +928,8 @@ class VariationalAutoencoder(nn.Module):
                 mc_samples:     int = 1,
                 iw_samples:     int = 1,
                ):
-        """
-        Compute evidence lower bound (ELBO).
+        """Compute evidence lower bound (ELBO)."""
         
-        Args:
-            y              (Tensor): Observed data.
-            grad_estimator (str):    Gradient estimator for inference model parameters:
-                                         "dreg" = doubly reparameterized gradient estimator
-                                         "iwae" = standard gradient estimator
-            mask           (Tensor): Binary mask indicating missing item responses.
-            covariates     (Tensor): Matrix of covariates.
-            mc_samples     (int):    Number of Monte Carlo samples.
-            iw_samples     (int):    Number of importance-weighted samples.
-        """
         if self.cov_size > 0:
             try:
                 _y = torch.cat((y, covariates), dim = 1)

@@ -65,7 +65,6 @@ In [4]: n_items = data.shape[1]
 
 In [5]: model = IWAVE(
    ...:       model_type = "grm",
-   ...:       input_size = n_items,
    ...:       latent_size = 4,
    ...:       n_cats = [3] * n_items,
    ...:       Q = torch.block_diag(*[torch.ones([3, 1])] * 4),

@@ -55,8 +55,8 @@ def screeplot(latent_sizes:             List[int],
         inference_net_sizes_list : list of list of int, default = None
             Neural net hidden layer sizes for each latent dimension in the screeplot.
             
-            For example, when making a screeplot for three latent dimensions, we may set
-            inference_net_sizes_list = [[150, 75], [150, 75], [150, 75]] to use three neural nets
+            For example, when making a screeplot for three latent dimensions, setting
+            inference_net_sizes_list = [[150, 75], [150, 75], [150, 75]] creates three neural nets
             each with two hidden layers of size 150 and 75, respectively.
             
             The default inference_net_sizes_list = None sets each neural net to have a single
