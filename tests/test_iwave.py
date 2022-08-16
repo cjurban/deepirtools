@@ -94,14 +94,15 @@ def test_param_recovery(idx:             str,
             iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
-    model = IWAVE(#learning_rate = lr,
-                  device = device,
-                  input_size = n_items,
-                  inference_net_sizes = [100],
-                  latent_size = latent_size,
-                  **{**iwave_kwargs, **constraints},
-                  )
-    model.fit(res["Y"], covariates = res["covariates"], batch_size = 128, iw_samples = 5)
+    model = IWAVE(
+#        learning_rate = lr,
+        device = device,
+        input_size = n_items,
+        inference_net_sizes = [100],
+        latent_size = latent_size,
+        **{**iwave_kwargs, **constraints},
+    )
+    model.fit(res["Y"], covariates = res["covariates"], batch_size = 512, iw_samples = 5)
     
     exp_ldgs, exp_ints, exp_cov_mat = res["loadings"], res["intercepts"], res["cov_mat"]
     exp_res_std, exp_probs = res["residual_std"], res["probs"]
@@ -124,24 +125,24 @@ def test_param_recovery(idx:             str,
     est_res_std, est_probs = model.residual_std, model.probs
     est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
     
-    ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).abs()
-    ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].abs()
+    ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).pow(2)
+    ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].pow(2)
     assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(ldgs_err)
     assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(ints_err)
     if est_cov_mat is not None:
         if ((latent_size > 1 and cov_type != "fixed_variances_no_covariances") or
             (latent_size == 1 and cov_type == "free")):
-            cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().abs()
+            cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().pow(2)
             assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(cov_err)
     if est_res_std is not None:
-        res_std_err = est_res_std.add(-exp_res_std).abs()
+        res_std_err = est_res_std.add(-exp_res_std).pow(2)
         assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(res_std_err)
     if est_probs is not None:
-        probs_err = est_probs.add(-exp_probs).abs()
+        probs_err = est_probs.add(-exp_probs).pow(2)
         assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL)), print(probs_err)
     if mean_type == "latent_regression":
-        lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).abs()
+        lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).pow(2)
         assert(lreg_weight_err.mean().le(ABS_TOL)), print(lreg_weight_err)
     elif mean_type == "free":
-        mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).abs()
+        mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).pow(2)
         assert(mean_err.mean().le(ABS_TOL)), print(mean_err)

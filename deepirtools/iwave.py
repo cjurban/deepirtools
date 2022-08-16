@@ -14,6 +14,54 @@ from deepirtools.settings import GRAD_ESTIMATORS
 
   
 class IWAVE(BaseEstimator):
+    """Importance-weighted amortized variational estimator (I-WAVE).
+
+    Attributes
+    __________
+        loadings : Tensor
+            Factor loadings matrix.
+
+            A J X D matrix where J is the number of items and D is the latent dimension.
+        intercepts : Tensor
+            Intercepts.
+
+            When all items are continuous, a length J vector where J is the number of
+            items. When some items are graded (i.e., ordinal), a J X M matrix where
+            M is the maximum number of response categories across all items.
+        residual_std : Tensor or None
+            Residual standard deviations.
+
+            A length J vector where J is the number of items. Only applicable to normal
+            and lognormal factor models.
+        probs : Tensor or None
+            Success probabilities for Bernoulli trials.
+
+            A length J vector where J is the number of items. Only applicable to negative
+            binomial factor models.
+        cov : Tensor
+            Factor covariance matrix.
+
+            A D X D matrix where D is the latent dimension.
+        mean : Tensor
+            Factor mean vector.
+
+            A length D vector where D is the latent dimension.
+        latent_regression_weight : Tensor or None
+            Latent regression weight matrix.
+
+            A D X C matrix where D is the latent dimension and C is the number of covariates.
+            Only applicable to latent regression models.
+        grad_estimator : str
+            Gradient estimator for inference model parameters.
+        device : str
+            Computing device used for fitting.
+        verbose : bool
+            Whether to print updates during fitting.
+        global_iter : int
+            Number of mini-batches processed during fitting.
+        timerecords : dict
+            Stores run times for various processes (e.g., fitting).
+    """
     
     def __init__(self,
                  model_type:          Union[str, List[str]],
@@ -25,38 +73,64 @@ class IWAVE(BaseEstimator):
                  n_intervals:         int = 100,
                  **model_kwargs,
                 ):
-        """
-        Importance-weighted amortized variational estimator (I-WAVE).
+        """Initialize I-WAVE.
         
-        Args:
-            model_type         (str/List of str): Measurement model type. Can either be a string if all items
-                                                  have same type or a list of strings specifying each item type.
-                                                  Current options are:
-                                                      "grm"               = graded response model
-                                                      "gpcm"              = generalized partial credit model
-                                                      "poisson"           = poisson factor model
-                                                      "negative_binomial" = negative binomial factor model
-                                                      "normal"            = normal factor model
-                                                      "lognormal"         = lognormal factor model
-            learning_rate      (float):           Step size for stochastic gradient optimizer.
-            device             (str):             Computing device used for fitting.
-            gradient_estimator (str):             Gradient estimator for inference model parameters:
-                                                      "dreg" = doubly reparameterized gradient estimator
-                                                      "iwae" = standard gradient estimator
-            log_interval       (str):             Frequency of updates printed during fitting.
-            verbose            (bool):            Whether to print updates during fitting.
-            n_intervals        (str):             Number of 100-batch intervals after which fitting is terminated if
-                                                  best average loss does not improve.
-            model_kwargs       (dict):            Named parameters passed to VariationalAutoencoder.__init__().
+        Parameters
+        __________
+            model_type : str or list of str)
+                Measurement model type.
+                
+                Can either be a string if all items have same type or a list of strings specifying each
+                item type. Current options are:
+
+                  "grm" : graded response model
+                  "gpcm" : generalized partial credit model
+                  "poisson" : poisson factor model
+                  "negative_binomial" : negative binomial factor model
+                  "normal" : normal factor model
+                  "lognormal" : lognormal factor model
+            learning_rate : float, default = 1e-3
+                Step size for stochastic gradient optimizer.
+                
+                This is the main hyperparameter that may require tuning. Decreasing it typically
+                improves optimization stability at the cost of increased fitting time.
+            device : str, default = "cpu"
+                Computing device used for fitting.
+                
+                Current options are:
+                
+                "cpu" : CPU
+                "cuda" : GPU
+            gradient_estimator : str, default = "dreg"
+                Gradient estimator for inference model parameters.
+                
+                Current options are:
+                    "dreg" : doubly reparameterized gradient estimator
+                    "iwae" : standard gradient estimator
+                    
+                "dreg" is the recommended option due to its bounded variance as the number of
+                importance-weighted samples increases.
+            log_interval : str, default = 100
+                Number of mini-batches between printed updates during fitting.
+            verbose : bool, default = True
+                Whether to print updates during fitting.
+            n_intervals : str, default = 100
+                Number of 100-mini-batch intervals after which fitting is terminated if best average
+                loss does not improve.
+            **model_kwargs # TODO: Specify these.
+                Keyword arguments passed to VariationalAutoencoder.__init__().
         """
+        
         super().__init__(device, log_interval, verbose, n_intervals)
-        assert(gradient_estimator in GRAD_ESTIMATORS), "gradient_estimator must be one of {}".format(GRAD_ESTIMATORS)
+        assert(gradient_estimator in GRAD_ESTIMATORS), ("gradient_estimator ",
+                                                        "must be one of {}".format(GRAD_ESTIMATORS))
         self.grad_estimator = gradient_estimator
         self.runtime_kwargs["grad_estimator"] = gradient_estimator
         
         model_names = [k for k, _ in ModelTypes().MODEL_TYPES.items()]
         if isinstance(model_type, list):
-            assert(all(m in model_names for m in model_type)), "All elements of model_type must be one of {}".format(model_names)
+            assert(all(m in model_names for m in model_type)), ("All elements ",
+                                                                "of model_type must be one of {}".format(model_names))
             model_kwargs["model_types"] = model_type
             decoder = MixedFactorModel
         else:
@@ -122,7 +196,36 @@ class IWAVE(BaseEstimator):
                        mc_samples:   int = 1,
                        iw_samples:   int = 5000,
                       ):
-        """Log-likelihood for a data set."""
+        """Approximate log-likelihood of a data set.
+        
+        Parameters
+        __________
+            data : Tensor
+                Data set.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            missing_mask : Tensor, default = None
+                Binary mask indicating missing item responses.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            covariates : Tensor, default = None
+                Matrix of covariates.
+                
+                An N X C matrix where N is the number of people and C is the number of covariates.
+            mc_samples : int, default = 1
+                Number of Monte Carlo samples.
+                
+                Increasing this decreases the log-likelihood estimator's variance.
+            iw_samples : int, default = 5000
+                Number of importance-weighted samples.
+                
+                Increasing this decreases the log-likelihood estimator's bias.
+        
+        Returns
+        _______
+            Approximate log-likelihood of the data set.
+        """
+        
         loader =  torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask,
                                    covariates = covariates),
@@ -156,6 +259,37 @@ class IWAVE(BaseEstimator):
                mc_samples:   int = 1,
                iw_samples:   int = 5000,
               ):
+        """Approximate expected a posteriori (EAP) factor scores given a data set.
+        
+        Parameters
+        __________
+            data : Tensor
+                Data set.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            missing_mask : Tensor, default = None
+                Binary mask indicating missing item responses.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            covariates : Tensor, default = None
+                Matrix of covariates.
+                
+                An N X C matrix where N is the number of people and C is the number of covariates.
+            mc_samples : int, default = 1
+                Number of Monte Carlo samples.
+                
+                Increasing this decreases the EAP estimator's variance.
+            iw_samples : int, default = 5000
+                Number of importance-weighted samples.
+                
+                Increasing this decreases the EAP estimator's bias. When iw_samples > 1, samples
+                are drawn from the expected importance-weighted distribution using sampling-
+                importance-resampling. # TODO : Include reference.
+        
+        Returns
+        _______
+            Approximate EAP factor scores given the data set.
+        """
         
         loader = torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask,

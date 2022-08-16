@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Union
 import matplotlib.pyplot as plt
 from pylab import *
 from deepirtools.iwave import IWAVE
@@ -9,7 +9,7 @@ from deepirtools.utils import manual_seed, invert_factors
 
 def screeplot(latent_sizes:             List[int],
               data:                     torch.Tensor,
-              model_type:               str,
+              model_type:               Union[str, List[str]],
               test_size:                float,
               inference_net_sizes_list: Optional[List[List[int]]] = None,
               learning_rates:           Optional[List[float]] = None,
@@ -27,29 +27,86 @@ def screeplot(latent_sizes:             List[int],
               title:                    str = "Approximate Log-Likelihood Scree Plot",
               **model_kwargs,          
              ):
-    """
-    In exploratory setting, make log-likelihood screeplot to detect number of latent factors.
+    """Make a log-likelihood screeplot.
     
-    Args:
-        latent_sizes             (List of int):         Latent dimensions to plot.
-        data                     (Tensor):              Data set containing item responses.
-        model_type               (str):                 Measurement model type.
-        test_size                (float):               Proportion of data used for calculating LL.
-        inference_net_sizes_list (List of List of int): Neural net input and hidden layer sizes for each latent dimension.
-        learning_rates           (List of float):       Step sizes for stochastic gradient optimizers.
-        missing_mask             (Tensor):              Binary mask indicating missing item responses.
-        max_epochs               (int):                 Number of passes through the full data set after which
-                                                        fitting should be terminated if convergence not achieved.
-        batch_size               (int):                 Mini-batch size for stochastic gradient optimizer.
-        gradient_estimator       (str):                 Gradient estimator for inference model parameters:
-        device                   (str):                 Computing device used for fitting.
-        log_interval             (str):                 Frequency of updates printed during fitting.
-        iw_samples_fit           (int):                 Number of importance-weight samples for fitting.
-        iw_samples_ll            (int):                 Number of importance-weight samples for calculating LL.
-        random_seed              (int):                 Seed for reproducibility.
-        model_kwargs             (dict):                Named parameters passed to VariationalAutoencoder.__init__().
+    Useful in the exploratory setting to detect the number of latent factors. Result is saved
+    as a PDF in the working directory.
+    
+    Parameters
+    __________
+        latent_sizes : list of int
+            Latent dimensions to plot.
+        data : Tensor
+            Data set containing item responses.
+        model_type : str or list of str
+            Measurement model type.
+            
+            Can either be a string if all items have same type or a list of strings
+            specifying each item type. Current options are:
+            
+              "grm" : graded response model
+              "gpcm" : generalized partial credit model
+              "poisson" : poisson factor model
+              "negative_binomial" : negative binomial factor model
+              "normal" : normal factor model
+              "lognormal" : lognormal factor model
+        test_size : float
+            Proportion of data used for calculating LL. Range of values is (0, 1).
+        inference_net_sizes_list : list of list of int, default = None
+            Neural net hidden layer sizes for each latent dimension in the screeplot.
+            
+            For example, when making a screeplot for three latent dimensions, we may set
+            inference_net_sizes_list = [[150, 75], [150, 75], [150, 75]] to use three neural nets
+            each with two hidden layers of size 150 and 75, respectively.
+            
+            The default inference_net_sizes_list = None sets each neural net to have a single
+            hidden layer of size 100.
+        learning_rates : list of float, default = None
+            Step sizes for stochastic gradient optimizers.
+            
+            The default learning_rates = None sets each optimizer's step size to 1e-3.
+        missing_mask : Tensor, default = None
+            Binary mask indicating missing item responses.
+        max_epochs : int, default = None
+            Number of passes through the full data set after which fitting should be terminated if
+            convergence not achieved.
+        batch_size : int, default = 32
+            Mini-batch size for stochastic gradient optimizer.
+        gradient_estimator : str, default = "dreg"
+            Gradient estimator for inference model parameters.
+            
+            Current options are:
+              "dreg" : doubly reparameterized gradient estimator
+              "iwae" : standard gradient estimator
+              
+            Note: "dreg" is the recommended option due to its bounded variance as the number of importance-weighted
+            samples increases.
+        device : int, default = "cpu"
+            Computing device used for fitting.
+        log_interval : str, default = 100
+            Frequency of updates printed during fitting.
+        iw_samples_fit : int, default = 1
+            Number of importance-weighted samples for fitting.
+        iw_samples_ll : int, default = 5000
+            Number of importance-weighted samples for calculating approximate log-likelihoods.
+        random_seed : int, default = 1
+            Seed for reproducibility.
+        xlabel : str, default = "Number of Factors"
+            Screeplot x-axis label.
+        ylabel : str, default = "Predicted Approximate Negative Log-Likelihood"
+            Screeplot y-axis label.
+        title : str, default = "Approximate Log-Likelihood Scree Plot"
+            Screeplot title.
+        **model_kwargs
+            User-specified keyword arguments passed to VariationalAutoencoder.__init__().
+            
+        Returns
+        _______
+        List of approximate hold-out set log-likelihoods for each latent dimension.
+        
     """
-    assert(test_size > 0 and test_size < 1), "Test size must be between 0 and 1."
+    
+    assert(0 < test_size < 1), "Test size must be between 0 and 1."
     sample_size = data.size(0)
     n_items = data.size(1)
     
@@ -103,19 +160,34 @@ def screeplot(latent_sizes:             List[int],
     return ll_list
 
     
-def loadings_heatmap(loadings:     torch.Tensor,
-                     x_label:      str = "Factor", 
-                     y_label:      str = "Item", 
-                     title:        str = "Factor Loadings"):
-    """Make heatmap of factor loadings."""
+def loadings_heatmap(loadings: torch.Tensor,
+                     xlabel:   str = "Factor", 
+                     ylabel:   str = "Item", 
+                     title:    str = "Factor Loadings"):
+    """Make heatmap of factor loadings.
+    
+    Result is saved as a PDF in the working directory.
+    
+    Parameters
+    __________
+        loadings : Tensor
+            Factor loadings matrix.
+        xlabel : str, default = "Factor"
+            Heatmap x-axis label.
+        ylabel : str, default = "Item"
+            Heatmap y-axis label.
+        title : str, default = "Factor Loadings"
+            Heatmap title.
+    """
+    
     latent_size = loadings.shape[1]
     
     c = pcolor(invert_factors(loadings))
     set_cmap("gray_r")
     colorbar() 
     c = pcolor(invert_factors(loadings), edgecolors = "w", linewidths = 1, vmin = 0) 
-    xlabel(x_label)
-    ylabel(y_label)
+    xlabel(xlabel)
+    ylabel(ylabel)
     xticks(np.arange(latent_size) + 0.5,
            [str(size + 1) for size in range(latent_size)])
     ytick_vals = [int(10 * (size + 1)) for size in range(latent_size)]

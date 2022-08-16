@@ -13,6 +13,21 @@ class OptimizationWarning(UserWarning):
 
 
 class BaseEstimator():
+    """Base class from which other estimation methods inherit.
+    
+    Includes methods to fit new models as well as to save and load fitted models.
+    
+    Attributes
+    __________
+        device : str
+            Computing device used for fitting.
+        verbose : bool
+            Whether to print updates during fitting.
+        global_iter : int
+            Number of mini-batches processed during fitting.
+        timerecords : dict
+            Stores run times for various processes (e.g., fitting).
+    """
 
     def __init__(self,
                  device:                str = "cpu",
@@ -20,16 +35,21 @@ class BaseEstimator():
                  verbose:               bool = True,
                  n_intervals:           int = 100,
                 ):
-        """
-        Base class from which other estimation methods inherit.
+        """Initialize BaseEstimator.
         
-        Args:
-            device       (str):  Computing device used for fitting.
-            log_interval (str):  Frequency of updates printed during fitting.
-            verbose      (bool): Whether to print updates during fitting.
-            n_intervals  (str):  Number of 100-batch intervals after which fitting is terminated if
-                                 best average loss does not improve.
+        Parameters
+        __________
+            device : str, default = "cpu"
+                Computing device used for fitting.
+            log_interval : int, default = 100
+                Number of mini-batches between printed updates during fitting.
+            verbose : bool, default = True
+                Whether to print updates during fitting.
+            n_intervals : int, default = 100
+                Number of 100-mini-batch intervals after which fitting is terminated if
+                best average loss does not improve.
         """
+        
         self.device = device
         self.verbose = verbose
 
@@ -49,6 +69,7 @@ class BaseEstimator():
              **model_kwargs,
             ):
         """One fitting iteration."""
+        
         if self.model.training:
             self.optimizer.zero_grad()
             
@@ -68,6 +89,7 @@ class BaseEstimator():
               **model_kwargs,
              ):
         """Full pass through data set."""
+        
         self.model.train()
         train_loss = 0
 
@@ -93,6 +115,7 @@ class BaseEstimator():
              **model_kwargs,
             ):
         """Evaluate model on a data set."""
+        
         self.model.eval()
         test_loss = 0
         
@@ -115,15 +138,29 @@ class BaseEstimator():
         """
         Fit model to a data set.
         
-        Args:
-            data         (Tensor): Data set containing item responses.
-            batch_size   (int):    Mini-batch size for stochastic gradient optimizer.
-            missing_mask (Tensor): Binary mask indicating missing item responses.
-            covariates   (Tensor): Matrix of covariates.
-            max_epochs   (int):    Number of passes through the full data set after which
-                                   fitting should be terminated if convergence not achieved.
-            model_kwargs (dict):   Named parameters passed to self.model.forward().
+        Parameters
+        __________
+            data : Tensor
+                Data set.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            batch_size : int, default = 32
+                Mini-batch size for stochastic gradient optimizer.
+            missing_mask : Tensor, default = None
+                Binary mask indicating missing item responses.
+                
+                An N X J matrix where N is the number of people and J is the number of items.
+            covariates : Tensor, default = None
+                Matrix of covariates.
+                
+                An N X C matrix where N is the number of people and C is the number of covariates.
+            max_epochs : int, default = 100000
+                Number of passes through the full data set after which fitting should be
+                terminated if convergence not achieved.
+            **model_kwargs # TODO: Specify these.
+                Keyword arguments passed to self.model.forward().
         """
+        
         if self.verbose:
             print("\nFitting started", end = "\n")
         start = timeit.default_timer()
@@ -153,6 +190,16 @@ class BaseEstimator():
                    model_name: str,
                    save_path:  str,
                   ):
+        """Save fitted model.
+        
+        Parameters
+        __________
+            model_name : str
+                Name for fitted model.
+            save_path : str
+                Where to save fitted model.
+        """
+        
         with torch.no_grad():
             torch.save(self.model.state_dict(), 
                        os.path.join(save_path, model_name) + ".pth")
@@ -161,4 +208,17 @@ class BaseEstimator():
                    model_name: str,
                    load_path: str,
                   ):
+        """Load fitted model.
+        
+        The initialized model should have the same hyperparameter settings as the
+        fitted model that is being loaded (e.g., the same number of latent variables).
+        
+        Parameters
+        __________
+            model_name : str
+                Name of fitted model.
+            load_path : str
+                Where to load fitted model from.
+        """
+        
         self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth"))
