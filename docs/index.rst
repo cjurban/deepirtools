@@ -1,8 +1,10 @@
 .. deepirtools documentation master file, created by
-   sphinx-quickstart on Wed Aug 17 09:39:52 2022.
+   sphinx-quickstart on Wed Aug 17 12:02:48 2022.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+Welcome to deepirtools's documentation!
+=======================================
 
 .. toctree::
    :maxdepth: 2
