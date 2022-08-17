@@ -1,6 +1,10 @@
+.. rst-class: center
+
 ###########
 DeepIRTools
 ###########
+
+.. rst-class: center
 
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 Deep Learning-Based Estimation and Inference for Item Response Theory Models
