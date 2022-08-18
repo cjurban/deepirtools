@@ -17,6 +17,18 @@ class BaseEstimator():
     
     Includes methods to fit new models as well as to save and load fitted models.
     
+    Parameters
+    __________
+    device : str, default = "cpu"
+        Computing device used for fitting.
+    log_interval : int, default = 100
+        Number of mini-batches between printed updates during fitting.
+    verbose : bool, default = True
+        Whether to print updates during fitting.
+    n_intervals : int, default = 100
+        Number of 100-mini-batch intervals after which fitting is terminated if
+        best average loss does not improve.
+    
     Attributes
     __________
     device : str
@@ -35,21 +47,6 @@ class BaseEstimator():
                  verbose:               bool = True,
                  n_intervals:           int = 100,
                 ):
-        """Initialize BaseEstimator.
-        
-        Parameters
-        __________
-        device : str, default = "cpu"
-            Computing device used for fitting.
-        log_interval : int, default = 100
-            Number of mini-batches between printed updates during fitting.
-        verbose : bool, default = True
-            Whether to print updates during fitting.
-        n_intervals : int, default = 100
-            Number of 100-mini-batch intervals after which fitting is terminated if
-            best average loss does not improve.
-        """
-        
         self.device = device
         self.verbose = verbose
 

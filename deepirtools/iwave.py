@@ -15,6 +15,124 @@ from deepirtools.settings import GRAD_ESTIMATORS
   
 class IWAVE(BaseEstimator):
     r"""Importance-weighted amortized variational estimator (I-WAVE).
+    
+    Parameters
+    __________
+    model_type : str or list of str)
+        Measurement model type.
+
+        Can either be a string if all items have same type or a list of strings specifying each
+        item type. Current options are:
+
+        * "grm", graded response model;
+        * "gpcm", generalized partial credit model;
+        * "poisson", poisson factor model;
+        * "negative_binomial", negative binomial factor model;
+        * "normal", normal factor model; and
+        * "lognormal", lognormal factor model.
+    latent_size : int
+        Number of latent factors.
+    n_cats : list of int and None, optional
+        Number of response categories for each item.
+
+        Only needed if some items are categorical. Any continuous items or counts are indicated
+        with None.
+
+        For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1--2 are categorical
+        with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
+    n_items : int, optional
+        Number of items.
+
+        Only specified if all items are continuous. Not needed if n_cats is specified instead.
+    inference_net_sizes : list of int, default = [100]
+        Neural network inference model hidden layer dimensions.
+
+        For example, setting ``inference_net_sizes = [100, 100]`` creates a neural network
+        inference model with two hidden layers of size 100.
+    fixed_variances : bool, default = True
+        Whether to constrain variances of latent factors to one.
+    fixed_means : bool, default = True
+        Whether to constrain means of latent factors to zero.
+    correlated_factors : list of int, default = []
+        Which latent factors should be correlated.
+
+        For example, setting ``correlated_factors = [0, 3, 4]`` in a model with 5 latent
+        factors models the correlations between the first, fourth, and fifth factors
+        while constraining the other correlations to zero.
+    covariate_size : int, default = None
+        Number of covariates for latent regression.
+    Q : Tensor, default = None
+        Binary matrix indicating measurement structure.
+
+        A :math:`J \times D` matrix where :math:`J` is the number of items and :math:`D`
+        is the latent dimension. Elements of :math:`\mathbf{Q}` are zero if the corresponding
+        loading is set to zero and one otherwise:
+
+        .. math::
+           \beta_{j,d} = q_{j,d} \beta_{j,d}',
+
+        where :math:`\beta_{j,d}` is the loading for item :math:`j` on factor :math:`d`,
+        :math:`q_{j,d} \in \{0, 1\}` is an element of :math:`\mathbf{Q}`, and :math:`\beta_{j,d}'`
+        is an unconstrained loading.
+    A : Tensor, default = None
+        Matrix imposing linear constraints on loadings.
+
+        Linear constraints are imposed as follows:
+
+        .. math::
+           \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
+
+        where :math:`\boldsymbol{\beta} = (\beta_{1, 1}, \ldots, \beta_{J, 1}, \ldots,
+        \beta_{1, D}, \ldots, \beta_{J, D})^\top` is a :math:`DJ \times 1` vector of
+        constrained loadings values, :math:`\boldsymbol{b}` is a :math:`DJ \times 1`
+        vector of constants, :math:`\boldsymbol{A}` is a :math:`DJ \times DJ` matrix
+        of constants, and :math:`\boldsymbol{\beta}' = (\beta_{1, 1}', \ldots, \beta_{J, 1}',
+        \ldots, \beta_{1, D}', \ldots, \beta_{J, D}')^\top` is a :math:`DJ \times 1` vector of
+        unconstrained loadings.
+    b : Tensor, default = None
+        Vector imposing linear constraints on loadings.
+
+        See above for elaboration on linear constraints.
+    ints_mask : Tensor, default = None
+        Vector constraining specific intercepts to zero.
+
+        A length :math:`J` vector where :math:`J` is the number of items. For categorical
+        items, only the smallest category intercept is constrained to zero.
+    learning_rate : float, default = 0.001
+        Step size for stochastic gradient optimizer.
+
+        This is the main hyperparameter that may require tuning. Decreasing it typically
+        improves optimization stability at the cost of increased fitting time.
+    device : str, default = "cpu"
+        Computing device used for fitting.
+
+        Current options are:
+
+        * "cpu", central processing unit; and
+        * "cuda", graphics processing unit.
+    gradient_estimator : str, default = "dreg"
+        Gradient estimator for inference model parameters.
+
+        Current options are:
+
+        * "dreg", doubly reparameterized gradient estimator; and
+        * "iwae", standard gradient estimator.
+
+        "dreg" is the recommended option due to its bounded variance as the number of
+        importance-weighted samples tends to infinity.
+    log_interval : str, default = 100
+        Number of mini-batches between printed updates during fitting.
+    verbose : bool, default = True
+        Whether to print updates during fitting.
+    n_intervals : str, default = 100
+        Number of 100-mini-batch intervals after which fitting is terminated if best average
+        loss does not improve.
+    use_spline_prior : bool, default = False
+        Whether to use spline/spline coupling prior.
+    count_bins : int, optional
+        Number of segments for each spline transformation.
+    bound : float, optional
+        Quantity determining the bounding box of each spline transformation.
 
     Attributes
     __________
@@ -62,6 +180,20 @@ class IWAVE(BaseEstimator):
         Number of mini-batches processed during fitting.
     timerecords : dict
         Stores run times for various processes (e.g., fitting).
+        
+    References
+    ----------
+    [1] Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional
+    exploratory item factor analysis. *Psychometrika*, *86*(1), 1-29.
+    `https://link.springer.com/article/10.1007/s11336-021-09748-3
+    <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
+    
+    [2] Urban, C. J. (2021). *Machine learning-based estimation and goodness-of-fit for
+    large-scale confirmatory item factor analysis* (Publication No. 28772217)
+    [Master's thesis, University of North Carolina at Chapel Hill].
+    ProQuest Dissertations Publishing.
+    `https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/
+    <https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/>`_
     """
     
     def __init__(self,
@@ -74,127 +206,6 @@ class IWAVE(BaseEstimator):
                  n_intervals:         int = 100,
                  **model_kwargs,
                 ):
-        r"""Initialize I-WAVE.
-        
-        Parameters
-        __________
-        model_type : str or list of str)
-            Measurement model type.
-
-            Can either be a string if all items have same type or a list of strings specifying each
-            item type. Current options are:
-
-            * "grm", graded response model;
-            * "gpcm", generalized partial credit model;
-            * "poisson", poisson factor model;
-            * "negative_binomial", negative binomial factor model;
-            * "normal", normal factor model; and
-            * "lognormal", lognormal factor model.
-        latent_size : int
-            Number of latent factors.
-        n_cats : list of int and None, optional
-            Number of response categories for each item.
-
-            Only needed if some items are categorical. Any continuous items or counts are indicated
-            with None.
-
-            For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1--2 are categorical
-            with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
-        n_items : int, optional
-            Number of items.
-
-            Only specified if all items are continuous. Not needed if n_cats is specified instead.
-        inference_net_sizes : list of int, default = [100]
-            Neural network inference model hidden layer dimensions.
-
-            For example, setting ``inference_net_sizes = [100, 100]`` creates a neural network
-            inference model with two hidden layers of size 100.
-        fixed_variances : bool, default = True
-            Whether to constrain variances of latent factors to one.
-        fixed_means : bool, default = True
-            Whether to constrain means of latent factors to zero.
-        correlated_factors : list of int, default = []
-            Which latent factors should be correlated.
-
-            For example, setting ``correlated_factors = [0, 3, 4]`` in a model with 5 latent
-            factors models the correlations between the first, fourth, and fifth factors
-            while constraining the other correlations to zero.
-        covariate_size : int, default = None
-            Number of covariates for latent regression.
-        Q : Tensor, default = None
-            Binary matrix indicating measurement structure.
-
-            A :math:`J \times D` matrix where :math:`J` is the number of items and :math:`D`
-            is the latent dimension. Elements of :math:`\mathbf{Q}` are zero if the corresponding
-            loading is set to zero and one otherwise:
-            
-            .. math::
-               \beta_{j,d} = q_{j,d} \beta_{j,d}',
-            
-            where :math:`\beta_{j,d}` is the loading for item :math:`j` on factor :math:`d`,
-            :math:`q_{j,d} \in \{0, 1\}` is an element of :math:`\mathbf{Q}`, and :math:`\beta_{j,d}'`
-            is an unconstrained loading.
-        A : Tensor, default = None
-            Matrix imposing linear constraints on loadings.
-
-            Linear constraints are imposed as follows:
-
-            .. math::
-               \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
-
-            where :math:`\boldsymbol{\beta} = (\beta_{1, 1}, \ldots, \beta_{J, 1}, \ldots,
-            \beta_{1, D}, \ldots, \beta_{J, D})^\top` is a :math:`DJ \times 1` vector of
-            constrained loadings values, :math:`\boldsymbol{b}` is a :math:`DJ \times 1`
-            vector of constants, :math:`\boldsymbol{A}` is a :math:`DJ \times DJ` matrix
-            of constants, and :math:`\boldsymbol{\beta}' = (\beta_{1, 1}', \ldots, \beta_{J, 1}',
-            \ldots, \beta_{1, D}', \ldots, \beta_{J, D}')^\top` is a :math:`DJ \times ` vector of
-            unconstrained loadings.
-        b : Tensor, default = None
-            Vector imposing linear constraints on loadings.
-
-            See above for elaboration on linear constraints.
-        ints_mask : Tensor, default = None
-            Vector constraining specific intercepts to zero.
-
-            A length :math:`J` vector where :math:`J` is the number of items. For categorical
-            items, only the smallest category intercept is constrained to zero.
-        learning_rate : float, default = 0.001
-            Step size for stochastic gradient optimizer.
-
-            This is the main hyperparameter that may require tuning. Decreasing it typically
-            improves optimization stability at the cost of increased fitting time.
-        device : str, default = "cpu"
-            Computing device used for fitting.
-
-            Current options are:
-
-            * "cpu", central processing unit; and
-            * "cuda", graphics processing unit.
-        gradient_estimator : str, default = "dreg"
-            Gradient estimator for inference model parameters.
-
-            Current options are:
-
-            * "dreg", doubly reparameterized gradient estimator; and
-            * "iwae", standard gradient estimator.
-
-            "dreg" is the recommended option due to its bounded variance as the number of
-            importance-weighted samples tends to infinity.
-        log_interval : str, default = 100
-            Number of mini-batches between printed updates during fitting.
-        verbose : bool, default = True
-            Whether to print updates during fitting.
-        n_intervals : str, default = 100
-            Number of 100-mini-batch intervals after which fitting is terminated if best average
-            loss does not improve.
-        use_spline_prior : bool, default = False
-            Whether to use spline/spline coupling prior.
-        count_bins : int, optional
-            Number of segments for each spline transformation.
-        bound : float, optional
-            Quantity determining the bounding box of each spline transformation.
-        """
-        
         super().__init__(device, log_interval, verbose, n_intervals)
         assert(gradient_estimator in GRAD_ESTIMATORS), ("gradient_estimator ",
                                                         "must be one of {}".format(GRAD_ESTIMATORS))
@@ -365,7 +376,7 @@ class IWAVE(BaseEstimator):
 
             Increasing this decreases the EAP estimator's bias. When ``iw_samples > 1``, samples
             are drawn from the expected importance-weighted distribution using sampling-
-            importance-resampling. # TODO : Include reference.
+            importance-resampling.
         
         Returns
         _______
@@ -374,6 +385,12 @@ class IWAVE(BaseEstimator):
             
             An :math:`N \times D` matrix where :math:`N` is the number of people and :math:`D`
             is the latent dimension.
+            
+        References
+        ----------
+        [1] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
+        autoencoders. In 5th International Conference on Learning Representations. ICLR.
+        `arXiv:1704.02916 <https://arxiv.org/abs/1704.02916>`_.
         """
         
         loader = torch.utils.data.DataLoader(

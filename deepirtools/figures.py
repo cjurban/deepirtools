@@ -67,7 +67,7 @@ def screeplot(latent_sizes:             List[int],
     learning_rates : list of float, default = None
         Step sizes for stochastic gradient optimizers.
         
-        The default ``learning_rates = None`` sets each optimizer's step size to 1e-3.
+        The default ``learning_rates = None`` sets each optimizer's step size to 0.001.
     missing_mask : Tensor, default = None
         Binary mask indicating missing item responses.
 
@@ -125,7 +125,7 @@ def screeplot(latent_sizes:             List[int],
     if inference_net_sizes_list is None:
         inference_net_sizes_list = [[100]] * len(latent_sizes)
     if learning_rates is None:
-        learning_rates = [1e-3] * len(latent_sizes)
+        learning_rates = [0.001] * len(latent_sizes)
     latent_sizes, learning_rates, inference_net_sizes_list = zip(*sorted(zip(latent_sizes,
                                                                              learning_rates,
                                                                              inference_net_sizes_list)))
