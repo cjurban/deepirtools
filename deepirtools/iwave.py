@@ -66,7 +66,7 @@ class IWAVE(BaseEstimator):
     
     def __init__(self,
                  model_type:          Union[str, List[str]],
-                 learning_rate:       float = 1e-3,
+                 learning_rate:       float = 0.001,
                  device:              str = "cpu",
                  gradient_estimator:  str = "dreg",
                  log_interval:        int = 100,
@@ -155,7 +155,7 @@ class IWAVE(BaseEstimator):
 
             A length :math:`J` vector where :math:`J` is the number of items. For categorical
             items, only the smallest category intercept is constrained to zero.
-        learning_rate : float, default = 1e-3
+        learning_rate : float, default = 0.001
             Step size for stochastic gradient optimizer.
 
             This is the main hyperparameter that may require tuning. Decreasing it typically
