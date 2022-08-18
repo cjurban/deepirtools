@@ -24,12 +24,12 @@ class IWAVE(BaseEstimator):
         Can either be a string if all items have same type or a list of strings specifying each
         item type. Current options are:
 
-        * "grm", graded response model;
-        * "gpcm", generalized partial credit model;
-        * "poisson", poisson factor model;
-        * "negative_binomial", negative binomial factor model;
-        * "normal", normal factor model; and
-        * "lognormal", lognormal factor model.
+        * \"grm\", graded response model;
+        * \"gpcm\", generalized partial credit model;
+        * \"poisson\", poisson factor model;
+        * \"negative_binomial\", negative binomial factor model;
+        * \"normal\", normal factor model; and
+        * \"lognormal\", lognormal factor model.
     latent_size : int
         Number of latent factors.
     n_cats : list of int and None, optional
@@ -77,6 +77,7 @@ class IWAVE(BaseEstimator):
     A : Tensor, default = None
         Matrix imposing linear constraints on loadings.
 
+        Let :math:`J` be the number of items and :math:`D` be the latent dimension.
         Linear constraints are imposed as follows:
 
         .. math::
@@ -94,7 +95,7 @@ class IWAVE(BaseEstimator):
 
         See above for elaboration on linear constraints.
     ints_mask : Tensor, default = None
-        Vector constraining specific intercepts to zero.
+        Binary vector constraining specific intercepts to zero.
 
         A length :math:`J` vector where :math:`J` is the number of items. For categorical
         items, only the smallest category intercept is constrained to zero.
@@ -108,17 +109,17 @@ class IWAVE(BaseEstimator):
 
         Current options are:
 
-        * "cpu", central processing unit; and
-        * "cuda", graphics processing unit.
+        * \"cpu\", central processing unit; and
+        * \"cuda\", graphics processing unit.
     gradient_estimator : str, default = "dreg"
         Gradient estimator for inference model parameters.
 
         Current options are:
 
-        * "dreg", doubly reparameterized gradient estimator; and
-        * "iwae", standard gradient estimator.
+        * \"dreg\", doubly reparameterized gradient estimator; and
+        * \"iwae\", standard gradient estimator.
 
-        "dreg" is the recommended option due to its bounded variance as the number of
+        \"dreg\" is the recommended option due to its bounded variance as the number of
         importance-weighted samples tends to infinity.
     log_interval : str, default = 100
         Number of mini-batches between printed updates during fitting.
@@ -184,7 +185,7 @@ class IWAVE(BaseEstimator):
     References
     ----------
     [1] Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional
-    exploratory item factor analysis. *Psychometrika*, *86*(1), 1-29.
+    exploratory item factor analysis. *Psychometrika*, *86* (1), 1-29.
     `https://link.springer.com/article/10.1007/s11336-021-09748-3
     <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
     

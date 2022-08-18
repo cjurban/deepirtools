@@ -47,12 +47,12 @@ def screeplot(latent_sizes:             List[int],
         Can either be a string if all items have same type or a list of strings
         specifying each item type. Current options are:
         
-        * "grm", graded response model;
-        * "gpcm", generalized partial credit model;
-        * "poisson", poisson factor model;
-        * "negative_binomial", negative binomial factor model;
-        * "normal", normal factor model; and
-        * "lognormal", lognormal factor model.
+        * \"grm\", graded response model;
+        * \"gpcm\", generalized partial credit model;
+        * \"poisson\", poisson factor model;
+        * \"negative_binomial\", negative binomial factor model;
+        * \"normal\", normal factor model; and
+        * \"lognormal\", lognormal factor model.
     test_size : float
         Proportion of data used for calculating LL. Range of values is :math:`(0, 1)`.
     inference_net_sizes_list : list of list of int, default = None
@@ -83,10 +83,10 @@ def screeplot(latent_sizes:             List[int],
         
         Current options are:
         
-        * "dreg", doubly reparameterized gradient estimator; and
-        * "iwae", standard gradient estimator.
+        * \"dreg\", doubly reparameterized gradient estimator; and
+        * \"iwae\", standard gradient estimator.
         
-        "dreg" is the recommended option due to its bounded variance as the number of importance-weighted
+        \"dreg\" is the recommended option due to its bounded variance as the number of importance-weighted
         samples increases.
     device : int, default = "cpu"
         Computing device used for fitting.

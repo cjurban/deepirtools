@@ -65,7 +65,11 @@ To cite DeepIRTools in publications, use:
 
 To cite the method, use:
 
-* Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. Psychometrika, 86(1), 1-29. `https://link.springer.com/article/10.1007/s11336-021-09748-3 <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
+* Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional exploratory  item factor analysis. *Psychometrika*, *86* (1), 1--29. `https://link.springer.com/article/10.1007/s11336-021-09748-3 <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
+
+and/or:
+
+* Urban, C. J. (2021). *Machine learning-based estimation and goodness-of-fit for large-scale confirmatory item factor analysis* (Publication No. 28772217) [Master's thesis, University of North Carolina at Chapel Hill]. ProQuest Dissertations Publishing. `https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/ <https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/>`_
 
 BibTeX entries for LaTeX users are:
 
@@ -79,8 +83,6 @@ BibTeX entries for LaTeX users are:
        url = {https://github.com/cjurban/deepirtools},
   }
 
-and:
-
 .. code:: bibtex
 
   @article{UrbanBauer2021,
@@ -91,6 +93,17 @@ and:
       volume = {86},
       number = {1},
       pages = {1--29}
+  }
+
+.. code:: bibtex
+
+  @phdthesis{Urban2021,
+      author  = {Urban, Christopher J.},
+      title   = {{M}achine learning-based estimation and goodness-of-fit for large-scale confirmatory item factor analysis},
+      publisher = {ProQuest Dissertations Publishing},
+      school  = {University of North Carolina at Chapel Hill},
+      year    = {2021},
+      type    = {Master's thesis},
   }
 
 .. toctree::
