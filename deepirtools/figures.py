@@ -34,83 +34,82 @@ def screeplot(latent_sizes:             List[int],
     
     Parameters
     __________
-        latent_sizes : list of int
-            Latent dimensions to plot.
-        data : Tensor
-            Data set.
-
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
-            is the number of items.
-        model_type : str or list of str
-            Measurement model type.
-            
-            Can either be a string if all items have same type or a list of strings
-            specifying each item type. Current options are:
-            
-                * "grm", graded response model;
-                * "gpcm", generalized partial credit model;
-                * "poisson", poisson factor model;
-                * "negative_binomial", negative binomial factor model;
-                * "normal", normal factor model; and
-                * "lognormal", lognormal factor model.
-        test_size : float
-            Proportion of data used for calculating LL. Range of values is :math:`(0, 1)`.
-        inference_net_sizes_list : list of list of int, default = None
-            Neural net hidden layer sizes for each latent dimension in the screeplot.
-            
-            For example, when making a screeplot for three latent dimensions, setting
-            ``inference_net_sizes_list = [[150, 75], [150, 75], [150, 75]]`` creates three neural nets
-            each with two hidden layers of size 150 and 75, respectively.
-            
-            The default ``inference_net_sizes_list = None`` sets each neural net to have a single
-            hidden layer of size 100.
-        learning_rates : list of float, default = None
-            Step sizes for stochastic gradient optimizers.
-            
-            The default ``learning_rates = None`` sets each optimizer's step size to 1e-3.
-        missing_mask : Tensor, default = None
-            Binary mask indicating missing item responses.
-
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
-            is the number of items.
-        max_epochs : int, default = None
-            Number of passes through the full data set after which fitting should be terminated if
-            convergence not achieved.
-        batch_size : int, default = 32
-            Mini-batch size for stochastic gradient optimizer.
-        gradient_estimator : str, default = "dreg"
-            Gradient estimator for inference model parameters.
-            
-            Current options are:
-
-                * "dreg", doubly reparameterized gradient estimator; and
-                * "iwae", standard gradient estimator.
-              
-            "dreg" is the recommended option due to its bounded variance as the number of importance-weighted
-            samples increases.
-        device : int, default = "cpu"
-            Computing device used for fitting.
-        log_interval : str, default = 100
-            Frequency of updates printed during fitting.
-        iw_samples_fit : int, default = 1
-            Number of importance-weighted samples for fitting.
-        iw_samples_ll : int, default = 5000
-            Number of importance-weighted samples for calculating approximate log-likelihoods.
-        random_seed : int, default = 1
-            Seed for reproducibility.
-        xlabel : str, default = "Number of Factors"
-            Screeplot x-axis label.
-        ylabel : str, default = "Predicted Approximate Negative Log-Likelihood"
-            Screeplot y-axis label.
-        title : str, default = "Approximate Log-Likelihood Scree Plot"
-            Screeplot title.
-        **model_kwargs
-            Additional keyword arguments passed to ``IWAVE.__init__()``.
-            
-        Returns
-        _______
-        List of approximate hold-out set log-likelihoods for each latent dimension.
+    latent_sizes : list of int
+        Latent dimensions to plot.
+    data : Tensor
+        Data set.
         
+        An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+        is the number of items.
+    model_type : str or list of str
+        Measurement model type.
+        
+        Can either be a string if all items have same type or a list of strings
+        specifying each item type. Current options are:
+        
+        * "grm", graded response model;
+        * "gpcm", generalized partial credit model;
+        * "poisson", poisson factor model;
+        * "negative_binomial", negative binomial factor model;
+        * "normal", normal factor model; and
+        * "lognormal", lognormal factor model.
+    test_size : float
+        Proportion of data used for calculating LL. Range of values is :math:`(0, 1)`.
+    inference_net_sizes_list : list of list of int, default = None
+        Neural net hidden layer sizes for each latent dimension in the screeplot.
+        
+        For example, when making a screeplot for three latent dimensions, setting
+        ``inference_net_sizes_list = [[150, 75], [150, 75], [150, 75]]`` creates three neural nets
+        each with two hidden layers of size 150 and 75, respectively.
+        
+        The default ``inference_net_sizes_list = None`` sets each neural net to have a single
+        hidden layer of size 100.
+    learning_rates : list of float, default = None
+        Step sizes for stochastic gradient optimizers.
+        
+        The default ``learning_rates = None`` sets each optimizer's step size to 1e-3.
+    missing_mask : Tensor, default = None
+        Binary mask indicating missing item responses.
+
+        An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+        is the number of items.
+    max_epochs : int, default = None
+        Number of passes through the full data set after which fitting should be terminated if
+        convergence not achieved.
+    batch_size : int, default = 32
+        Mini-batch size for stochastic gradient optimizer.
+    gradient_estimator : str, default = "dreg"
+        Gradient estimator for inference model parameters.
+        
+        Current options are:
+        
+        * "dreg", doubly reparameterized gradient estimator; and
+        * "iwae", standard gradient estimator.
+        
+        "dreg" is the recommended option due to its bounded variance as the number of importance-weighted
+        samples increases.
+    device : int, default = "cpu"
+        Computing device used for fitting.
+    log_interval : str, default = 100
+        Frequency of updates printed during fitting.
+    iw_samples_fit : int, default = 1
+        Number of importance-weighted samples for fitting.
+    iw_samples_ll : int, default = 5000
+        Number of importance-weighted samples for calculating approximate log-likelihoods.
+    random_seed : int, default = 1
+        Seed for reproducibility.
+    xlabel : str, default = "Number of Factors"
+        Screeplot x-axis label.
+    ylabel : str, default = "Predicted Approximate Negative Log-Likelihood"
+        Screeplot y-axis label.
+    title : str, default = "Approximate Log-Likelihood Scree Plot"
+        Screeplot title.
+    **model_kwargs
+        Additional keyword arguments passed to ``IWAVE.__init__()``.
+        
+    Returns
+    _______
+    List of approximate hold-out set log-likelihoods for each latent dimension.
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."
@@ -177,14 +176,14 @@ def loadings_heatmap(loadings: torch.Tensor,
     
     Parameters
     __________
-        loadings : Tensor
-            Factor loadings matrix.
-        xlabel : str, default = "Factor"
-            Heatmap x-axis label.
-        ylabel : str, default = "Item"
-            Heatmap y-axis label.
-        title : str, default = "Factor Loadings"
-            Heatmap title.
+    loadings : Tensor
+        Factor loadings matrix.
+    xlabel : str, default = "Factor"
+        Heatmap x-axis label.
+    ylabel : str, default = "Item"
+        Heatmap y-axis label.
+    title : str, default = "Factor Loadings"
+        Heatmap title.
     """
     
     latent_size = loadings.shape[1]

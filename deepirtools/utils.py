@@ -64,8 +64,8 @@ def invert_factors(mat: torch.Tensor):
     
     Parameters
     __________
-        mat : Tensor
-            Loadings matrix.
+    mat : Tensor
+        Loadings matrix.
     """
     
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
@@ -84,10 +84,10 @@ def invert_cov(cov: torch.Tensor,
     
     Parameters
     __________
-        cov : Tensor
-            Factor covariance matrix.
-        mat : Tensor
-            Loadings matrix.
+    cov : Tensor
+        Factor covariance matrix.
+    mat : Tensor
+        Loadings matrix.
     """
     
     assert(len(cov.shape) == 2), "Factor covariance matrix must be 2D."
@@ -110,10 +110,10 @@ def invert_mean(mean: torch.Tensor,
     
     Parameters
     __________
-        mean : Tensor
-            Factor mean vector.
-        mat : Tensor
-            Loadings matrix.
+    mean : Tensor
+        Factor mean vector.
+    mat : Tensor
+        Loadings matrix.
     """
     
     assert(len(mean.shape) == 1), "Factor mean vector must be 1D."
@@ -133,10 +133,10 @@ def invert_latent_regression_weight(weight: torch.Tensor,
 
     Parameters
     __________
-        weight : Tensor
-            Latent regression weight matrix.
-        mat : Tensor
-            Loadings matrix.
+    weight : Tensor
+        Latent regression weight matrix.
+    mat : Tensor
+        Loadings matrix.
     """
     
     assert(len(weight.shape) == 2), "Latent regression weight matrix must be 2D."
@@ -154,8 +154,8 @@ def normalize_loadings(mat: torch.Tensor):
     
     Parameters
     __________
-        mat : Tensor
-            Loadings matrix.
+    mat : Tensor
+        Loadings matrix.
     """
     
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
@@ -173,12 +173,12 @@ def normalize_ints(ints:   torch.Tensor,
     
     Parameters
     __________
-        ints : Tensor
-            Intercepts vector.
-        mat : Tensor
-            Loadings matrix.
-        n_cats : list of int
-            Number of categories for each item.
+    ints : Tensor
+        Intercepts vector.
+    mat : Tensor
+        Loadings matrix.
+    n_cats : list of int
+        Number of categories for each item.
     """
     
     assert(len(ints.shape) == 1), "Intercepts vector must be 1D."

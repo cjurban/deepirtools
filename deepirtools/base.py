@@ -19,14 +19,14 @@ class BaseEstimator():
     
     Attributes
     __________
-        device : str
-            Computing device used for fitting.
-        verbose : bool
-            Whether to print updates during fitting.
-        global_iter : int
-            Number of mini-batches processed during fitting.
-        timerecords : dict
-            Stores run times for various processes (e.g., fitting).
+    device : str
+        Computing device used for fitting.
+    verbose : bool
+        Whether to print updates during fitting.
+    global_iter : int
+        Number of mini-batches processed during fitting.
+    timerecords : dict
+        Stores run times for various processes (e.g., fitting).
     """
 
     def __init__(self,
@@ -39,15 +39,15 @@ class BaseEstimator():
         
         Parameters
         __________
-            device : str, default = "cpu"
-                Computing device used for fitting.
-            log_interval : int, default = 100
-                Number of mini-batches between printed updates during fitting.
-            verbose : bool, default = True
-                Whether to print updates during fitting.
-            n_intervals : int, default = 100
-                Number of 100-mini-batch intervals after which fitting is terminated if
-                best average loss does not improve.
+        device : str, default = "cpu"
+            Computing device used for fitting.
+        log_interval : int, default = 100
+            Number of mini-batches between printed updates during fitting.
+        verbose : bool, default = True
+            Whether to print updates during fitting.
+        n_intervals : int, default = 100
+            Number of 100-mini-batch intervals after which fitting is terminated if
+            best average loss does not improve.
         """
         
         self.device = device
@@ -135,39 +135,38 @@ class BaseEstimator():
             max_epochs:     int = 100000,
             **model_kwargs,
            ):
-        """
-        Fit model to a data set.
-        
+        """Fit model to a data set.
+
         Parameters
         __________
-            data : Tensor
-                Data set.
-                
-                An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
-                is the number of items.
-            batch_size : int, default = 32
-                Mini-batch size for stochastic gradient optimizer.
-            missing_mask : Tensor, default = None
-                Binary mask indicating missing item responses.
-                
-                An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
-                is the number of items.
-            covariates : Tensor, default = None
-                Matrix of covariates.
-                
-                An :math:`N \times C` matrix where :math:`N` is the number of people and :math:`C`
-                is the number of covariates.
-            max_epochs : int, default = 100000
-                Number of passes through the full data set after which fitting should be
-                terminated if convergence not achieved.
-            mc_samples : int, default = 1
-                Number of Monte Carlo samples.
-                
-                Increasing this decreases the log-likelihood estimator's variance.
-            iw_samples : int, default = 5000
-                Number of importance-weighted samples.
-                
-                Increasing this decreases the log-likelihood estimator's bias.
+        data : Tensor
+            Data set.
+
+            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            is the number of items.
+        batch_size : int, default = 32
+            Mini-batch size for stochastic gradient optimizer.
+        missing_mask : Tensor, default = None
+            Binary mask indicating missing item responses.
+
+            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            is the number of items.
+        covariates : Tensor, default = None
+            Matrix of covariates.
+
+            An :math:`N \times C` matrix where :math:`N` is the number of people and :math:`C`
+            is the number of covariates.
+        max_epochs : int, default = 100000
+            Number of passes through the full data set after which fitting should be
+            terminated if convergence not achieved.
+        mc_samples : int, default = 1
+            Number of Monte Carlo samples.
+
+            Increasing this decreases the log-likelihood estimator's variance.
+        iw_samples : int, default = 5000
+            Number of importance-weighted samples.
+
+            Increasing this decreases the log-likelihood estimator's bias.
         """
         
         if self.verbose:
@@ -203,10 +202,10 @@ class BaseEstimator():
         
         Parameters
         __________
-            model_name : str
-                Name for fitted model.
-            save_path : str
-                Where to save fitted model.
+        model_name : str
+            Name for fitted model.
+        save_path : str
+            Where to save fitted model.
         """
         
         with torch.no_grad():
@@ -224,10 +223,10 @@ class BaseEstimator():
         
         Parameters
         __________
-            model_name : str
-                Name of fitted model.
-            load_path : str
-                Where to load fitted model from.
+        model_name : str
+            Name of fitted model.
+        load_path : str
+            Where to load fitted model from.
         """
         
         self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth"))
