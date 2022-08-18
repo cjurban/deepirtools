@@ -27,7 +27,7 @@ def screeplot(latent_sizes:             List[int],
               title:                    str = "Approximate Log-Likelihood Scree Plot",
               **model_kwargs,          
              ):
-    """Make a log-likelihood screeplot.
+    r"""Make a log-likelihood screeplot.
     
     Useful in the exploratory setting to detect the number of latent factors. Result is saved
     as a PDF in the working directory.
@@ -109,7 +109,8 @@ def screeplot(latent_sizes:             List[int],
         
     Returns
     _______
-    List of approximate hold-out set log-likelihoods for each latent dimension.
+    ll_list : list of float
+        List of approximate hold-out set log-likelihoods for each latent dimension.
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."

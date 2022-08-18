@@ -11,15 +11,15 @@ def load_grm():
     
     Returns
     _______
-    A dictionary containing sampled data and data-generating parameters.
+    res : dict
+        A dictionary containing sampled data and data-generating parameters. 
+        The returned dictionary includes the following key-value pairs:
 
-    The returned dictionary includes the following key-value pairs:
-
-    * "data" : The sampled data set of item responses.
-    * "loadings" : The data-generating factor loadings.
-    * "intercepts" : The data-generating category intercepts.
-    * "cov_mat" : The data-generating factor covariance matrix.
-    * "factor_scores" : The sampled factor scores.
+        * "data", the sampled data set of item responses;
+        * "loadings", the data-generating factor loadings;
+        * "intercepts", the data-generating category intercepts;
+        * "cov_mat", the data-generating factor covariance matrix; and
+        * "factor_scores", the sampled factor scores.
     """
     
     keys = ["data", "loadings", "intercepts", "cov_mat", "factor_scores"]

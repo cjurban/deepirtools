@@ -14,7 +14,7 @@ from deepirtools.settings import GRAD_ESTIMATORS
 
   
 class IWAVE(BaseEstimator):
-    """Importance-weighted amortized variational estimator (I-WAVE).
+    r"""Importance-weighted amortized variational estimator (I-WAVE).
 
     Attributes
     __________
@@ -74,7 +74,7 @@ class IWAVE(BaseEstimator):
                  n_intervals:         int = 100,
                  **model_kwargs,
                 ):
-        """Initialize I-WAVE.
+        r"""Initialize I-WAVE.
         
         Parameters
         __________
@@ -98,7 +98,7 @@ class IWAVE(BaseEstimator):
             Only needed if some items are categorical. Any continuous items or counts are indicated
             with None.
 
-            For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1-2 are categorical
+            For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1--2 are categorical
             with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
         n_items : int, optional
             Number of items.
@@ -267,7 +267,7 @@ class IWAVE(BaseEstimator):
                        mc_samples:   int = 1,
                        iw_samples:   int = 5000,
                       ):
-        """Approximate log-likelihood of a data set.
+        r"""Approximate log-likelihood of a data set.
         
         Parameters
         __________
@@ -297,7 +297,8 @@ class IWAVE(BaseEstimator):
         
         Returns
         _______
-        Approximate log-likelihood of the data set.
+        ll : float
+            Approximate log-likelihood of the data set.
         """
         
         loader =  torch.utils.data.DataLoader(
@@ -333,7 +334,7 @@ class IWAVE(BaseEstimator):
                mc_samples:   int = 1,
                iw_samples:   int = 5000,
               ):
-        """Approximate expected a posteriori (EAP) factor scores given a data set.
+        r"""Approximate expected a posteriori (EAP) factor scores given a data set.
         
         Parameters
         __________
@@ -365,7 +366,11 @@ class IWAVE(BaseEstimator):
         
         Returns
         _______
-        Approximate EAP factor scores given the data set.
+        factor_scores : Tensor
+            Approximate EAP factor scores given the data set.
+            
+            An :math:`N \times D` matrix where :math:`N` is the number of people and :math:`D`
+            is the latent dimension.
         """
         
         loader = torch.utils.data.DataLoader(

@@ -9,7 +9,7 @@ from itertools import chain
 
 
 def manual_seed(seed: int):
-    """Set random seed to ensure reproducible results."""
+    """Set random seeds to ensure reproducible results."""
     
     random.seed(seed)
     np.random.seed(seed)
@@ -66,6 +66,11 @@ def invert_factors(mat: torch.Tensor):
     __________
     mat : Tensor
         Loadings matrix.
+        
+    Returns
+    -------
+    inverted_mat : Tensor
+        Inverted loadings matrix.
     """
     
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
@@ -88,6 +93,11 @@ def invert_cov(cov: torch.Tensor,
         Factor covariance matrix.
     mat : Tensor
         Loadings matrix.
+        
+    Returns
+    -------
+    inverted_cov : Tensor
+        Inverted factor covariance matrix.
     """
     
     assert(len(cov.shape) == 2), "Factor covariance matrix must be 2D."
@@ -114,6 +124,11 @@ def invert_mean(mean: torch.Tensor,
         Factor mean vector.
     mat : Tensor
         Loadings matrix.
+        
+    Returns
+    -------
+    inverted_mean : Tensor
+        Inverted factor mean vector.
     """
     
     assert(len(mean.shape) == 1), "Factor mean vector must be 1D."
@@ -137,6 +152,11 @@ def invert_latent_regression_weight(weight: torch.Tensor,
         Latent regression weight matrix.
     mat : Tensor
         Loadings matrix.
+        
+    Returns
+    -------
+    inverted_weight : Tensor
+        Inverted latent regression weight matrix.
     """
     
     assert(len(weight.shape) == 2), "Latent regression weight matrix must be 2D."
@@ -156,6 +176,11 @@ def normalize_loadings(mat: torch.Tensor):
     __________
     mat : Tensor
         Loadings matrix.
+        
+    Returns
+    -------
+    normalized_mat : Tensor
+        Normalized loadings matrix.
     """
     
     assert(len(mat.shape) == 2), "Loadings matrix must be 2D."
@@ -179,6 +204,11 @@ def normalize_ints(ints:   torch.Tensor,
         Loadings matrix.
     n_cats : list of int
         Number of categories for each item.
+        
+    Returns
+    -------
+    normalized_ints : Tensor
+        Normalized intercepts vector.
     """
     
     assert(len(ints.shape) == 1), "Intercepts vector must be 1D."

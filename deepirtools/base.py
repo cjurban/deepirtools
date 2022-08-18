@@ -135,7 +135,7 @@ class BaseEstimator():
             max_epochs:     int = 100000,
             **model_kwargs,
            ):
-        """Fit model to a data set.
+        r"""Fit model to a data set.
 
         Parameters
         __________
