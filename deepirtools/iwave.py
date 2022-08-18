@@ -127,7 +127,10 @@ class IWAVE(BaseEstimator):
             A :math:`J \times D` matrix where :math:`J` is the number of items and :math:`D`
             is the latent dimension. Elements of :math:`\mathbf{Q}` are zero if the corresponding
             loading is set to zero and one otherwise:
-            .. math:: \beta_{j,d} = q_{j,d} \beta_{j,d}',
+            
+            .. math::
+               \beta_{j,d} = q_{j,d} \beta_{j,d}',
+            
             where :math:`\beta_{j,d}` is the loading for item :math:`j` on factor :math:`d`,
             :math:`q_{j,d} \in \{0, 1\}` is an element of :math:`\mathbf{Q}`, and :math:`\beta_{j,d}'`
             is an unconstrained loading.
@@ -137,7 +140,7 @@ class IWAVE(BaseEstimator):
             Linear constraints are imposed as follows:
 
             .. math::
-            \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
+               \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
 
             where :math:`\boldsymbol{\beta} = (\beta_{1, 1}, \ldots, \beta_{J, 1}, \ldots,
             \beta_{1, D}, \ldots, \beta_{J, D})^\top` is a :math:`DJ \times 1` vector of
