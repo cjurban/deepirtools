@@ -24,7 +24,14 @@ class IWAVE(BaseEstimator):
         Can either be a string if all items have same type or a list of strings specifying each
         item type. Current options are:
 
-        * \"grm\", graded response model;
+        * \"grm\", graded response model:
+        .. math::
+            \Pr[y_j = k \mid \mathbf{x}] =
+            \begin{cases}
+                1 - \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $k = 0$} \\
+                \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}] - \sigma[\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $0 < k < K - 1$},\\
+                \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $k = K - 1$},
+            \end{cases}
         * \"gpcm\", generalized partial credit model;
         * \"poisson\", poisson factor model;
         * \"negative_binomial\", negative binomial factor model;
