@@ -119,6 +119,22 @@ def screeplot(latent_sizes:             List[int],
     _______
     ll_list : list of float
         List of approximate hold-out set log-likelihoods for each latent dimension.
+        
+    Examples
+    --------
+    .. code-block::
+    
+        >>> import deepirtools
+        >>> from deepirtools import screeplot
+        >>> deepirtools.manual_seed(123)
+        >>> data = deepirtools.load_grm()["data"]
+        >>> n_items = data.shape[1]
+        >>> screeplot(
+        ...     latent_sizes = [2, 3, 4, 5, 6],
+        ...     data = data,
+        ...     model_type = "grm",
+        ...     test_size = 0.1,
+        ... )
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."
@@ -127,8 +143,11 @@ def screeplot(latent_sizes:             List[int],
     
     train_idxs = torch.multinomial(torch.ones(sample_size), int(ceil((1 - test_size) * sample_size)))
     test_idxs = np.setdiff1d(range(sample_size), train_idxs)
-    data_train = data[train_idxs]; mask_train = missing_mask[train_idxs]
-    data_test = data[test_idxs]; mask_test = missing_mask[test_idxs]
+    data_train = data[train_idxs]; data_test = data[test_idxs]
+    if missing_mask is not None:
+        mask_train = missing_mask[train_idxs]; mask_test = missing_mask[test_idxs]
+    else:
+        mask_train = mask_test = None
     
     if inference_net_sizes_list is None:
         inference_net_sizes_list = [[100]] * len(latent_sizes)
@@ -155,7 +174,7 @@ def screeplot(latent_sizes:             List[int],
         model.fit(data_train, batch_size = batch_size, missing_mask = mask_train,
                   max_epochs = max_epochs, iw_samples = iw_samples_fit)
 
-        ll = model.log_likelihood(data_test, missing_mask=mask_test, iw_samples = iw_samples_ll)
+        ll = model.log_likelihood(data_test, missing_mask = mask_test, iw_samples = iw_samples_ll)
         ll_list.append(ll)
         
     fig, ax = plt.subplots(constrained_layout = True)
