@@ -63,10 +63,26 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # -- Options for HTML output -------------------------------------------------
 
+pygments_style = 'sphinx'
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#
+import sphinx_rtd_theme
 html_theme = 'sphinx_rtd_theme'
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+# Custom sidebar templates, must be a dictionary that maps document names
+# to template names.
+html_sidebars = {
+    '**': [
+        'about.html',
+        'navigation.html',
+        'relations.html',  # needs 'show_related': True theme option to display
+        'searchbox.html',
+        'donate.html',
+    ]
+}
+
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
