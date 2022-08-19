@@ -344,17 +344,17 @@ class IWAVE(BaseEstimator):
         data : Tensor
             Data set.
 
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
             is the number of items.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
             is the number of items.
         covariates : Tensor, default = None
             Matrix of covariates.
 
-            An :math:`N \times C` matrix where :math:`N` is the number of people and :math:`C`
+            An :math:`N \times C` matrix where :math:`N` is sample size and :math:`C`
             is the number of covariates.
         mc_samples : int, default = 1
             Number of Monte Carlo samples.
@@ -411,17 +411,17 @@ class IWAVE(BaseEstimator):
         data : Tensor
             Data set.
 
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
             is the number of items.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
-            An :math:`N \times J` matrix where :math:`N` is the number of people and :math:`J`
+            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
             is the number of items.
         covariates : Tensor, default = None
             Matrix of covariates.
 
-            An :math:`N \times C` matrix where :math:`N` is the number of people and :math:`C`
+            An :math:`N \times C` matrix where :math:`N` is the sample size and :math:`C`
             is the number of covariates.
         mc_samples : int, default = 1
             Number of Monte Carlo samples.
@@ -439,7 +439,7 @@ class IWAVE(BaseEstimator):
         factor_scores : Tensor
             Approximate EAP factor scores given the data set.
             
-            An :math:`N \times D` matrix where :math:`N` is the number of people and :math:`D`
+            An :math:`N \times D` matrix where :math:`N` is the sample size and :math:`D`
             is the latent dimension.
             
         References
