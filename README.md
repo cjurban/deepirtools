@@ -44,6 +44,8 @@ To install the latest version on GitHub:
 
 ## Documentation
 
+The official documentation is available [here](https://deepirtools.readthedocs.io/en/latest/).
+
 ## Examples
 
 ### Tutorial
