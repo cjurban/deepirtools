@@ -27,7 +27,7 @@ def screeplot(latent_sizes:             List[int],
               title:                    str = "Approximate Log-Likelihood Scree Plot",
               **model_kwargs,          
              ):
-    r"""Make a log-likelihood screeplot.
+    r"""Make a log-likelihood screeplot. [1]_
     
     Useful in the exploratory setting to detect the number of latent factors. Result is saved
     as a PDF in the working directory.

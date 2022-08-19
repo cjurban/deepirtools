@@ -14,7 +14,7 @@ from deepirtools.settings import GRAD_ESTIMATORS
 
   
 class IWAVE(BaseEstimator):
-    r"""Importance-weighted amortized variational estimator (I-WAVE).
+    r"""Importance-weighted amortized variational estimator (I-WAVE). [1]_ [2]_
     
     Parameters
     __________
@@ -152,7 +152,7 @@ class IWAVE(BaseEstimator):
         Only applicable when ``use_spline_prior = False``.
         
         Setting ``covariate_size > 0`` models the distribution of the latent factors
-        as:
+        as:[3]_ [4]_
         
         .. math::
             \boldsymbol{x} \mid \boldsymbol{z} \sim \mathcal{N}(\boldsymbol{\Gamma}^\top\boldsymbol{z}, \boldsymbol{\Sigma}),
@@ -205,7 +205,8 @@ class IWAVE(BaseEstimator):
         A length :math:`\text{n_items}` vector. For categorical items, only
         the smallest category intercept is constrained to zero.
     use_spline_prior : bool, default = False
-        Whether to use spline/spline coupling prior.
+        Whether to use spline/spline coupling prior distribution for the
+        latent factors. [5]_
     count_bins : int, optional
         Number of segments for each spline transformation.
     bound : float, optional
@@ -261,18 +262,34 @@ class IWAVE(BaseEstimator):
         
     References
     ----------
-    [1] Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional
-    exploratory item factor analysis. *Psychometrika*, *86* (1), 1-29.
-    `https://link.springer.com/article/10.1007/s11336-021-09748-3
-    <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
+    .. [1] Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional
+       exploratory item factor analysis. *Psychometrika*, *86* (1), 1-29.
+       `https://link.springer.com/article/10.1007/s11336-021-09748-3
+       <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
     
-    [2] Urban, C. J. (2021). *Machine learning-based estimation and goodness-of-fit for
-    large-scale confirmatory item factor analysis* (Publication No. 28772217)
-    [Master's thesis, University of North Carolina at Chapel Hill].
-    ProQuest Dissertations Publishing.
-    `https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/
-    <https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/>`_
-    """
+    .. [2] Urban, C. J. (2021). *Machine learning-based estimation and goodness-of-fit for
+       large-scale confirmatory item factor analysis* (Publication No. 28772217)
+       [Master's thesis, University of North Carolina at Chapel Hill].
+       ProQuest Dissertations Publishing.
+       `https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/
+       <https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/>`_
+    
+    .. [3] Camilli, G., & Fox, J.-P. (2015). An aggregate IRT procedure for exploratory
+       factor analysis. *Journal of Educational and Behavioral Statistics*, *40*, 377–-401.
+    
+    .. [4] von Davier, M., & Sinharay, S. (2010). Stochastic approximation methods for
+       latent regression item response models. *Journal of Educational and Behavioral
+       Statistics*, *35* (2), 174--193.
+    
+    .. [5] Durkan, C., Bekasov, A., Murray, I., & Papamakarios, G. (2019).
+       Neural spline flows. *Advances in Neural Information Processing Systems*, *32*.
+       `https://papers.nips.cc/paper/2019/hash/7ac71d433f282034e088473244df8c02-Abstract.html
+       <https://papers.nips.cc/paper/2019/hash/7ac71d433f282034e088473244df8c02-Abstract.html>`_
+       
+    .. [6] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
+       autoencoders. In 5th International Conference on Learning Representations. ICLR.
+       `https://arxiv.org/abs/1704.02916 <https://arxiv.org/abs/1704.02916>`_.
+       """
     
     def __init__(self,
                  model_type:          Union[str, List[str]],
@@ -448,7 +465,7 @@ class IWAVE(BaseEstimator):
 
             Increasing this decreases the EAP estimator's bias. When ``iw_samples > 1``, samples
             are drawn from the expected importance-weighted distribution using sampling-
-            importance-resampling.
+            importance-resampling. [6]_
         
         Returns
         _______
@@ -456,12 +473,6 @@ class IWAVE(BaseEstimator):
             Approximate EAP factor scores given the data set.
             
             A :math:`\text{sample_size} \times \text{latent_size}` matrix.
-            
-        References
-        ----------
-        [1] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
-        autoencoders. In 5th International Conference on Learning Representations. ICLR.
-        `arXiv:1704.02916 <https://arxiv.org/abs/1704.02916>`_.
         """
         
         loader = torch.utils.data.DataLoader(
