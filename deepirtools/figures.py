@@ -38,9 +38,8 @@ def screeplot(latent_sizes:             List[int],
         Latent dimensions to plot.
     data : Tensor
         Data set.
-        
-        An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-        is the number of items.
+
+        An :math:`\text{sample_size} \times \text{n_items}` matrix.
     model_type : str or list of str
         Measurement model type.
         
@@ -81,8 +80,7 @@ def screeplot(latent_sizes:             List[int],
     missing_mask : Tensor, default = None
         Binary mask indicating missing item responses.
 
-        An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-        is the number of items.
+        A :math:`\text{sample_size} \times \text{n_items}` matrix.
     max_epochs : int, default = None
         Number of passes through the full data set after which fitting should be terminated if
         convergence not achieved.

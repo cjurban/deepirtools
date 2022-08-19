@@ -25,9 +25,10 @@ class IWAVE(BaseEstimator):
         item type. 
         
         Let :math:`y_j` be the response to item :math:`j`, :math:`\boldsymbol{x}` be a
-        :math:`D \times 1` vector of latent factors, and :math:`\boldsymbol{\beta}_j` 
-        be a :math:`D \times 1` vector of factor loadings for item :math:`j`. Current 
-        measurement model options are:
+        :math:`\text{latent_size} \times 1` vector of latent factors, and
+        :math:`\boldsymbol{\beta}_j` be a :math:`\text{latent_size} \times 1`
+        vector of factor loadings for item :math:`j`. Current measurement model
+        options are:
 
         * \"grm\", graded response model:
         
@@ -76,7 +77,7 @@ class IWAVE(BaseEstimator):
               y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
             
           where :math:`y_j \in (-\infty, \infty)`,  :math:`\alpha_j` is the intercept
-          for item :math:`j`, :math:`\sigma_j^2` is the residual variance for item :math:`j`.
+          for item :math:`j`, and :math:`\sigma_j^2` is the residual variance for item :math:`j`.
         
         * \"lognormal\", lognormal factor model:
         
@@ -84,75 +85,6 @@ class IWAVE(BaseEstimator):
               \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
             
           where :math:`y_j > 0` and :math:`\alpha_j` is the intercept for item :math:`j`.
-    latent_size : int
-        Number of latent factors.
-    n_cats : list of int and None, optional
-        Number of response categories for each item.
-
-        Only needed if some items are categorical. Any continuous items or counts are indicated
-        with None.
-
-        For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1--2 are categorical
-        with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
-    n_items : int, optional
-        Number of items.
-
-        Only specified if all items are continuous. Not needed if n_cats is specified instead.
-    inference_net_sizes : list of int, default = [100]
-        Neural network inference model hidden layer dimensions.
-
-        For example, setting ``inference_net_sizes = [100, 100]`` creates a neural network
-        inference model with two hidden layers of size 100.
-    fixed_variances : bool, default = True
-        Whether to constrain variances of latent factors to one.
-    fixed_means : bool, default = True
-        Whether to constrain means of latent factors to zero.
-    correlated_factors : list of int, default = []
-        Which latent factors should be correlated.
-
-        For example, setting ``correlated_factors = [0, 3, 4]`` in a model with 5 latent
-        factors models the correlations between the first, fourth, and fifth factors
-        while constraining the other correlations to zero.
-    covariate_size : int, default = None
-        Number of covariates for latent regression.
-    Q : Tensor, default = None
-        Binary matrix indicating measurement structure.
-
-        A :math:`J \times D` matrix where :math:`J` is the number of items and :math:`D`
-        is the latent dimension. Elements of :math:`\mathbf{Q}` are zero if the corresponding
-        loading is set to zero and one otherwise:
-
-        .. math::
-           \beta_{j,d} = q_{j,d} \beta_{j,d}',
-
-        where :math:`\beta_{j,d}` is the loading for item :math:`j` on factor :math:`d`,
-        :math:`q_{j,d} \in \{0, 1\}` is an element of :math:`\mathbf{Q}`, and :math:`\beta_{j,d}'`
-        is an unconstrained loading.
-    A : Tensor, default = None
-        Matrix imposing linear constraints on loadings.
-
-        Let :math:`J` be the number of items and :math:`D` be the latent dimension.
-        Linear constraints are imposed as follows:
-
-        .. math::
-           \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
-
-        where :math:`\boldsymbol{\beta} = (\beta_{1, 1}, \ldots, \beta_{J, 1}, \ldots,
-        \beta_{1, D}, \ldots, \beta_{J, D})^\top` is a :math:`DJ \times 1` vector of
-        constrained loadings values, :math:`\boldsymbol{b}` is a :math:`DJ \times 1`
-        vector of constants, :math:`\boldsymbol{A}` is a :math:`DJ \times DJ` matrix
-        of constants, and :math:`\boldsymbol{\beta}' = (\beta_{1, 1}', \ldots, \beta_{J, 1}',
-        \ldots, \beta_{1, D}', \ldots, \beta_{J, D}')^\top` is a :math:`DJ \times 1` vector of
-        unconstrained loadings.
-    b : Tensor, default = None
-        Vector imposing linear constraints on loadings.
-
-        See above for elaboration on linear constraints.
-    ints_mask : Tensor, default = None
-        Binary vector constraining specific intercepts to zero.
-
-        A length :math:`J` vector where :math:`J` is the number of items. For categorical
-        items, only the smallest category intercept is constrained to zero.
     learning_rate : float, default = 0.001
         Step size for stochastic gradient optimizer.
 
@@ -183,6 +115,95 @@ class IWAVE(BaseEstimator):
     n_intervals : str, default = 100
         Number of 100-mini-batch intervals after which fitting is terminated if best average
         loss does not improve.
+    latent_size : int
+        Number of latent factors.
+    n_cats : list of int and None, optional
+        Number of response categories for each item.
+
+        Only needed if some items are categorical. Any continuous items or counts are indicated
+        with None.
+
+        For example, setting ``n_cats = [3, 3, None, 2]`` indicates that items 1--2 are categorical
+        with 3 categories, item 3 is continuous, and item 4 is categorical with 2 categories.
+    n_items : int, optional
+        Number of items.
+
+        Only specified if all items are continuous. Not needed if n_cats is specified instead.
+    inference_net_sizes : list of int, default = [100]
+        Neural network inference model hidden layer dimensions.
+
+        For example, setting ``inference_net_sizes = [100, 100]`` creates a neural network
+        inference model with two hidden layers of size 100.
+    fixed_variances : bool, default = True
+        Whether to constrain variances of latent factors to one.
+    fixed_means : bool, default = True
+        Whether to constrain means of latent factors to zero.
+    correlated_factors : list of int, default = []
+        Which latent factors should be correlated.
+        
+        Only applicable when ``use_spline_prior = False``.
+
+        For example, setting ``correlated_factors = [0, 3, 4]`` in a model with 5 latent
+        factors models the correlations between the first, fourth, and fifth factors
+        while constraining the other correlations to zero.
+    covariate_size : int, default = None
+        Number of covariates for latent regression.
+        
+        Only applicable when ``use_spline_prior = False``.
+        
+        Setting ``covariate_size > 0`` models the distribution of the latent factors
+        as:
+        
+        .. math::
+            \boldsymbol{x} \mid \boldsymbol{z} \sim \mathcal{N}(\boldsymbol{\Gamma}^\top\boldsymbol{z}, \boldsymbol{\Sigma}),
+
+        where :math:`\boldsymbol{\Gamma}` is a :math:`\text{latent_size}
+        \times \text{covariate_size}` matrix of regression weights,
+        :math:`\boldsymbol{z}` is a :math:`\text{covariate_size} \times
+        1` vector of covariates, and :math:`\boldsymbol{\Sigma}` is a
+        :math:`\text{latent_size} \times \text{latent_size}` factor covariance matrix.
+    Q : Tensor, default = None
+        Binary matrix indicating measurement structure.
+
+        A :math:`\text{n_items} \times \text{latent_size}` matrix.
+        Elements of :math:`\mathbf{Q}` are zero if the corresponding
+        loading is set to zero and one otherwise:
+
+        .. math::
+           \beta_{j,d} = q_{j,d} \beta_{j,d}',
+
+        where :math:`\beta_{j,d}` is the loading for item :math:`j` on factor :math:`d`,
+        :math:`q_{j,d} \in \{0, 1\}` is an element of :math:`\mathbf{Q}`, and :math:`\beta_{j,d}'`
+        is an unconstrained loading.
+    A : Tensor, default = None
+        Matrix imposing linear constraints on loadings.
+
+        Linear constraints are imposed as follows:
+
+        .. math::
+           \boldsymbol{\beta} = \boldsymbol{b} + \boldsymbol{A} \boldsymbol{\beta}',
+
+        where :math:`\boldsymbol{\beta} = (\beta_{1, 1}, \ldots, \beta_{\text{n_items}, 1},
+        \ldots, \beta_{1, \text{latent_size}}, \ldots, \beta_{\text{n_items},
+        \text{latent_size}})^\top` is a :math:`(\text{latent_size} \cdot \text{n_items})
+        \times 1` vector of constrained loadings values, :math:`\boldsymbol{b}` is a
+        :math:`(\text{latent_size} \cdot \text{n_items}) \times 1`
+        vector of constants, :math:`\boldsymbol{A}` is a :math:`(\text{latent_size} \cdot
+        \text{n_items}) \times (\text{latent_size} \cdot \text{n_items})` matrix
+        of constants, and :math:`\boldsymbol{\beta}' = (\beta_{1, 1}', \ldots,
+        \beta_{\text{n_items}, 1}', \ldots, \beta_{1, \text{latent_size}}',
+        \ldots, \beta_{\text{n_items}, \text{latent_size}}')^\top` is a
+        :math:`(\text{latent_size} \cdot \text{n_items}) \times 1` vector of
+        unconstrained loadings.
+    b : Tensor, default = None
+        Vector imposing linear constraints on loadings.
+
+        See above for elaboration on linear constraints.
+    ints_mask : Tensor, default = None
+        Binary vector constraining specific intercepts to zero.
+
+        A length :math:`\text{n_items}` vector. For categorical items, only
+        the smallest category intercept is constrained to zero.
     use_spline_prior : bool, default = False
         Whether to use spline/spline coupling prior.
     count_bins : int, optional
@@ -195,37 +216,38 @@ class IWAVE(BaseEstimator):
     loadings : Tensor
         Factor loadings matrix.
 
-        A :math:`J \times D` matrix where :math:`J` is the number of items and :math:`D`
-        is the latent dimension.
+        A :math:`\text{n_items} \times \text{latent_size}` matrix.
     intercepts : Tensor
         Intercepts.
 
-        When all items are continuous, a length :math:`J` vector where :math:`J`
-        is the number of items. When some items are graded (i.e., ordinal), a :math:`J \times M`
+        When all items are continuous, a length :math:`\text{n_items}` vector. When some
+        items are graded (i.e., ordinal), a :math:`\text{n_items} \times M`
         matrix where :math:`M` is the maximum number of response categories across all items.
     residual_std : Tensor or None
         Residual standard deviations.
 
-        A length :math:`J` vector where :math:`J` is the number of items. Only applicable to
-        normal and lognormal factor models.
+        A length :math:`\text{n_items}` vector. Only applicable to normal and
+        lognormal factor models.
     probs : Tensor or None
         Success probabilities for Bernoulli trials.
 
-        A length :math:`J` vector where :math:`J` is the number of items. Only applicable to
-        negative binomial factor models.
+        A length :math:`\text{n_items}` vector. Only applicable to negative
+        binomial factor models.
     cov : Tensor or None
         Factor covariance matrix.
 
-        A :math:`D \times D` matrix where :math:`D` is the latent dimension.
+        A :math:`\text{latent_size} \times \text{latent_size}` matrix. Only
+        applicable when ``use_spline_prior = False``.
     mean : Tensor or None
         Factor mean vector.
 
-        A length :math:`D` vector where :math:`D` is the latent dimension.
+        A length :math:`\text{latent_size}` vector. Only applicable when
+        ``use_spline_prior = False``.
     latent_regression_weight : Tensor or None
         Latent regression weight matrix.
 
-        A :math:`D \times C` matrix where :math:`D` is the latent dimension and :math:`C`
-        is the number of covariates. Only applicable to latent regression models.
+        A :math:`\text{latent_size} \times \text{covariate_size}`. Only
+        applicable to latent regression models.
     grad_estimator : str
         Gradient estimator for inference model parameters.
     device : str
@@ -344,18 +366,15 @@ class IWAVE(BaseEstimator):
         data : Tensor
             Data set.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         covariates : Tensor, default = None
             Matrix of covariates.
 
-            An :math:`N \times C` matrix where :math:`N` is sample size and :math:`C`
-            is the number of covariates.
+            A :math:`\text{sample_size} \times \text{covariate_size}` matrix.
         mc_samples : int, default = 1
             Number of Monte Carlo samples.
 
@@ -411,18 +430,15 @@ class IWAVE(BaseEstimator):
         data : Tensor
             Data set.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            An :math:`\text{sample_size} \times \text{n_items}` matrix.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         covariates : Tensor, default = None
             Matrix of covariates.
 
-            An :math:`N \times C` matrix where :math:`N` is the sample size and :math:`C`
-            is the number of covariates.
+            A :math:`\text{sample_size} \times \text{covariate_size}` matrix.
         mc_samples : int, default = 1
             Number of Monte Carlo samples.
 
@@ -439,8 +455,7 @@ class IWAVE(BaseEstimator):
         factor_scores : Tensor
             Approximate EAP factor scores given the data set.
             
-            An :math:`N \times D` matrix where :math:`N` is the sample size and :math:`D`
-            is the latent dimension.
+            A :math:`\text{sample_size} \times \text{latent_size}` matrix.
             
         References
         ----------

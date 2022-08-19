@@ -139,20 +139,17 @@ class BaseEstimator():
         data : Tensor
             Data set.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            An :math:`\text{sample_size} \times \text{n_items}` matrix.
         batch_size : int, default = 32
             Mini-batch size for stochastic gradient optimizer.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
-            An :math:`N \times J` matrix where :math:`N` is the sample size and :math:`J`
-            is the number of items.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         covariates : Tensor, default = None
             Matrix of covariates.
 
-            An :math:`N \times C` matrix where :math:`N` is the sample size and :math:`C`
-            is the number of covariates.
+            A :math:`\text{sample_size} \times \text{covariate_size}` matrix .
         max_epochs : int, default = 100000
             Number of passes through the full data set after which fitting should be
             terminated if convergence not achieved.
