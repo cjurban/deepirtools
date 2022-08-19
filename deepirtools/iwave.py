@@ -24,19 +24,49 @@ class IWAVE(BaseEstimator):
         Can either be a string if all items have same type or a list of strings specifying each
         item type. Current options are:
 
-        * \"grm\", graded response model:
+        * \"grm\", graded response model (GRM):
         .. math::
-            \Pr[y_j = k \mid \mathbf{x}] =
-            \begin{cases}
-                1 - \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $k = 0$} \\
-                \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}] - \sigma[\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $0 < k < K - 1$},\\
-                \sigma[\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}], & \text{if $k = K - 1$},
-            \end{cases}
-        * \"gpcm\", generalized partial credit model;
-        * \"poisson\", poisson factor model;
-        * \"negative_binomial\", negative binomial factor model;
-        * \"normal\", normal factor model; and
-        * \"lognormal\", lognormal factor model.
+            \begin{split}
+                \text{Pr}(y_j &= k \mid \mathbf{x}) \\
+                &=
+                \begin{cases}
+                    1 - \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
+                    \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
+                    \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = K_j - 1$},
+                \end{cases}
+            \end{split}
+        where :math:`y_j` is the response to item :math:`j`, :math:`\boldsymbol{x}` is a
+        :math:`D \times 1` vector of latent factors, :math:`\alpha_{j, k}` is the
+        :math:`k^\text{th}` category intercept for item :math:`j`, :math:`\boldsymbol{\beta}_j` 
+        is a :math:`D \times 1` loadings vector for item :math:`j`, :math:`K_j` is the
+        number of responses categories for item :math:`j`, :math:`j = 1, \ldots, J`, and
+        :math:`\sigma(z) = 1 / (1 + \exp[-z])` is the inverse logistic link function.
+        
+        * \"gpcm\", generalized partial credit model:
+        .. math::
+            \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
+        where :math:`k = 1, \ldots, K_j` and all terms are defined as for the GRM.
+        
+        * \"poisson\", poisson factor model:
+        .. math::
+            y_j \mid \boldsymbol{x} \sim \text{Pois}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j]),   
+        where :math:`y_j \in \mathbb{N}`, :math:`j = 1, \ldots, J`.
+        
+        * \"negative_binomial\", negative binomial factor model:
+        .. math::
+            y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j], p),   
+        where :math:`y_j \in \mathbb{N}`, :math:`j = 1, \ldots, J`, and
+        :math:`\mathbf{p}` is a success probability.
+        
+        * \"normal\", normal factor model:
+        .. math::
+            y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),    
+        where :math:`\sigma_j^2` is the residual variance for item :math:`j`, :math:`j = 1, \ldots, J`.
+        
+        * \"lognormal\", lognormal factor model:
+        .. math::
+            \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),    
+        where :math:`y_j > 0`, :math:`j = 1, \ldots, J`.
     latent_size : int
         Number of latent factors.
     n_cats : list of int and None, optional
@@ -118,6 +148,7 @@ class IWAVE(BaseEstimator):
 
         * \"cpu\", central processing unit; and
         * \"cuda\", graphics processing unit.
+        
     gradient_estimator : str, default = "dreg"
         Gradient estimator for inference model parameters.
 
