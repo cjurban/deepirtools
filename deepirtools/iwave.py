@@ -56,7 +56,7 @@ class IWAVE(BaseEstimator):
         .. math::
             y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j], p),   
         where :math:`y_j \in \mathbb{N}`, :math:`j = 1, \ldots, J`, and
-        :math:`\mathbf{p}` is a success probability.
+        :math:`p` is a success probability.
         
         * \"normal\", normal factor model:
         .. math::
