@@ -134,7 +134,73 @@ def screeplot(latent_sizes:             List[int],
         ...     data = data,
         ...     model_type = "grm",
         ...     test_size = 0.1,
+        ...     n_cats = [3] * n_items,
         ... )
+        Latent size =  2
+
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+
+        Fitting started
+        Epoch =     962 Iter. =  27901 Cur. loss =   11.08   Intervals no change = 100
+        Fitting ended in  47.45  seconds
+
+        Computing approx. LL
+        Approx. LL computed in 0.3 seconds
+
+        Latent size =  3
+
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+
+        Fitting started
+        Epoch =    1155 Iter. =  33501 Cur. loss =   11.20   Intervals no change = 100
+        Fitting ended in  56.25  seconds
+
+        Computing approx. LL
+        Approx. LL computed in 0.32 seconds
+
+        Latent size =  4
+
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+
+        Fitting started
+        Epoch =    1565 Iter. =  45401 Cur. loss =   11.25   Intervals no change = 100
+        Fitting ended in  77.18  seconds
+
+        Computing approx. LL
+        Approx. LL computed in 0.45 seconds
+
+        Latent size =  5
+
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+
+        Fitting started
+        Epoch =    1455 Iter. =  42201 Cur. loss =   11.42   Intervals no change = 100
+        Fitting ended in  69.31  seconds
+
+        Computing approx. LL
+        Approx. LL computed in 0.36 seconds
+
+        Latent size =  6
+
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+
+        Fitting started
+        Epoch =    1065 Iter. =  30901 Cur. loss =   11.26   Intervals no change = 100
+        Fitting ended in  50.4  seconds
+
+        Computing approx. LL
+        Approx. LL computed in 0.36 seconds
+        
+        [-1140.893642425537,
+         -1139.5399551391602,
+         -1137.2033195495605,
+         -1137.3607940673828,
+         -1136.9872550964355]
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."
@@ -166,7 +232,6 @@ def screeplot(latent_sizes:             List[int],
                       device = device,
                       gradient_estimator = gradient_estimator,
                       log_interval = log_interval,
-                      input_size = n_items,
                       latent_size = latent_size,
                       inference_net_sizes = inference_net_sizes_list[idx],
                       **model_kwargs,
