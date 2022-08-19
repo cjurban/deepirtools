@@ -38,7 +38,8 @@ class IWAVE(BaseEstimator):
                   &=
                   \begin{cases}
                       1 - \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
-                      \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
+                      \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} +
+                      \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
                       \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = K_j - 1$},
                   \end{cases}
               \end{split}
@@ -50,7 +51,9 @@ class IWAVE(BaseEstimator):
         * \"gpcm\", generalized partial credit model:
         
           .. math::
-              \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
+              \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top
+              \boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)
+              \boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
             
           where :math:`k = 1, \ldots, K_j` and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
           category intercept for item :math:`j`.
@@ -58,7 +61,8 @@ class IWAVE(BaseEstimator):
         * \"poisson\", poisson factor model:
         
           .. math::
-              y_j \mid \boldsymbol{x} \sim \text{Pois}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j]),
+              y_j \mid \boldsymbol{x} \sim \text{Pois}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x}
+              + \alpha_j]),
             
           where :math:`y_j \in \{ 0, 1, 2, \ldots \}` and :math:`\alpha_j` is the intercept
           for item :math:`j`.
@@ -66,7 +70,8 @@ class IWAVE(BaseEstimator):
         * \"negative_binomial\", negative binomial factor model:
         
           .. math::
-              y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j], p),
+              y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x}
+              + \alpha_j], p),
             
           where :math:`y_j \in \{ 0, 1, 2, \ldots \}`,  :math:`\alpha_j` is the intercept
           for item :math:`j`, and :math:`p` is a success probability.
@@ -74,7 +79,8 @@ class IWAVE(BaseEstimator):
         * \"normal\", normal factor model:
         
           .. math::
-              y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
+              y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x}
+              + \alpha_j, \sigma_j^2),
             
           where :math:`y_j \in (-\infty, \infty)`,  :math:`\alpha_j` is the intercept
           for item :math:`j`, and :math:`\sigma_j^2` is the residual variance for item :math:`j`.
@@ -82,7 +88,8 @@ class IWAVE(BaseEstimator):
         * \"lognormal\", lognormal factor model:
         
           .. math::
-              \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
+              \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x}
+              + \alpha_j, \sigma_j^2),
             
           where :math:`y_j > 0` and :math:`\alpha_j` is the intercept for item :math:`j`.
     learning_rate : float, default = 0.001
@@ -155,7 +162,8 @@ class IWAVE(BaseEstimator):
         as:[3]_ [4]_
         
         .. math::
-            \boldsymbol{x} \mid \boldsymbol{z} \sim \mathcal{N}(\boldsymbol{\Gamma}^\top\boldsymbol{z}, \boldsymbol{\Sigma}),
+            \boldsymbol{x} \mid \boldsymbol{z} \sim \mathcal{N}(\boldsymbol{\Gamma}^\top
+            \boldsymbol{z}, \boldsymbol{\Sigma}),
 
         where :math:`\boldsymbol{\Gamma}` is a :math:`\text{latent_size}
         \times \text{covariate_size}` matrix of regression weights,
@@ -289,7 +297,62 @@ class IWAVE(BaseEstimator):
     .. [6] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
        autoencoders. In 5th International Conference on Learning Representations. ICLR.
        `https://arxiv.org/abs/1704.02916 <https://arxiv.org/abs/1704.02916>`_.
-       """
+       
+    Examples
+    --------
+    .. code-block::
+    
+        >>> import deepirtools
+        >>> from deepirtools import IWAVE
+        >>> import torch
+        >>> deepirtools.manual_seed(123)
+        >>> data = deepirtools.load_grm()["data"]
+        >>> n_items = data.shape[1]
+        >>> model = IWAVE(
+        ...     model_type = "grm",
+        ...     latent_size = 4,
+        ...     n_cats = [3] * n_items,
+        ...     Q = torch.block_diag(*[torch.ones([3, 1])] * 4),
+        ...     correlated_factors = [0, 1, 2, 3],
+        ... )
+        Initializing model parameters
+        Initialization ended in  0.0  seconds
+        >>> model.fit(data, iw_samples = 5)
+        Fitting started
+        Epoch =     846 Iter. =  27101 Cur. loss =   11.15   Intervals no change = 100
+        Fitting ended in  95.14  seconds
+        >>> model.loadings
+        tensor([[1.4004, 0.0000, 0.0000, 0.0000],
+                [1.3816, 0.0000, 0.0000, 0.0000],
+                [0.5557, 0.0000, 0.0000, 0.0000],
+                [0.0000, 0.5833, 0.0000, 0.0000],
+                [0.0000, 1.0996, 0.0000, 0.0000],
+                [0.0000, 1.7175, 0.0000, 0.0000],
+                [0.0000, 0.0000, 0.7294, 0.0000],
+                [0.0000, 0.0000, 0.5775, 0.0000],
+                [0.0000, 0.0000, 1.1082, 0.0000],
+                [0.0000, 0.0000, 0.0000, 1.6827],
+                [0.0000, 0.0000, 0.0000, 0.7021],
+                [0.0000, 0.0000, 0.0000, 0.6706]])
+        >>> model.intercepts
+        tensor([[-1.2907,  1.4794],
+                [-0.6921,  1.2275],
+                [-0.4097,  0.3086],
+                [-2.0435,  1.3194],
+                [-2.8560,  1.0286],
+                [-0.2557,  1.9871],
+                [-1.6538,  0.6874],
+                [-0.4569,  0.8666],
+                [-1.2310,  1.7704],
+                [-1.1810,  0.2015],
+                [-0.6825,  2.5192],
+                [-2.8031,  2.7023]])
+        >>> model.cov
+        tensor([[1.0000, 0.1679, 0.1489, 0.2227],
+                [0.1679, 1.0000, 0.1406, 0.2248],
+                [0.1489, 0.1406, 1.0000, 0.1452],
+                [0.2227, 0.2248, 0.1452, 1.0000]])
+    """
     
     def __init__(self,
                  model_type:          Union[str, List[str]],
