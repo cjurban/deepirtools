@@ -22,51 +22,68 @@ class IWAVE(BaseEstimator):
         Measurement model type.
 
         Can either be a string if all items have same type or a list of strings specifying each
-        item type. Current options are:
+        item type. 
+        
+        Let :math:`y_j` be the response to item :math:`j`, :math:`\boldsymbol{x}` be a
+        :math:`D \times 1` vector of latent factors, and :math:`\boldsymbol{\beta}_j` 
+        be a :math:`D \times 1` vector of factor loadings for item :math:`j`. Current 
+        measurement model options are:
 
-        * \"grm\", graded response model (GRM):
-        .. math::
-            \begin{split}
-                \text{Pr}(y_j &= k \mid \mathbf{x}) \\
-                &=
-                \begin{cases}
-                    1 - \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
-                    \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
-                    \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = K_j - 1$},
-                \end{cases}
-            \end{split}
-        where :math:`y_j` is the response to item :math:`j`, :math:`\boldsymbol{x}` is a
-        :math:`D \times 1` vector of latent factors, :math:`\alpha_{j, k}` is the
-        :math:`k^\text{th}` category intercept for item :math:`j`, :math:`\boldsymbol{\beta}_j` 
-        is a :math:`D \times 1` loadings vector for item :math:`j`, :math:`K_j` is the
-        number of responses categories for item :math:`j`, :math:`j = 1, \ldots, J`, and
-        :math:`\sigma(z) = 1 / (1 + \exp[-z])` is the inverse logistic link function.
+        * \"grm\", graded response model:
+        
+          .. math::
+              \begin{split}
+                  &\text{Pr}(y_j = k \mid \mathbf{x}) \\
+                  &=
+                  \begin{cases}
+                      1 - \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
+                      \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
+                      \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = K_j - 1$},
+                  \end{cases}
+              \end{split}
+            
+          where :math:`\alpha_{j, k}` is the :math:`k^\text{th}` category intercept for item
+          :math:`j`, :math:`K_j` is the number of responses categories for item :math:`j`,
+          and :math:`\sigma(z) = 1 / (1 + \exp[-z])` is the inverse logistic link function.
         
         * \"gpcm\", generalized partial credit model:
-        .. math::
-            \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
-        where :math:`k = 1, \ldots, K_j` and all terms are defined as for the GRM.
+        
+          .. math::
+              \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)\boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
+            
+          where :math:`k = 1, \ldots, K_j` and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
+          category intercept for item :math:`j`.
         
         * \"poisson\", poisson factor model:
-        .. math::
-            y_j \mid \boldsymbol{x} \sim \text{Pois}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j]),   
-        where :math:`y_j \in \mathbb{N}`, :math:`j = 1, \ldots, J`.
+        
+          .. math::
+              y_j \mid \boldsymbol{x} \sim \text{Pois}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j]),
+            
+          where :math:`y_j \in \{ 0, 1, 2, \ldots \}` and :math:`\alpha_j` is the intercept
+          for item :math:`j`.
         
         * \"negative_binomial\", negative binomial factor model:
-        .. math::
-            y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j], p),   
-        where :math:`y_j \in \mathbb{N}`, :math:`j = 1, \ldots, J`, and
-        :math:`p` is a success probability.
+        
+          .. math::
+              y_j \mid \boldsymbol{x} \sim \text{NB}(\exp[\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j], p),
+            
+          where :math:`y_j \in \{ 0, 1, 2, \ldots \}`,  :math:`\alpha_j` is the intercept
+          for item :math:`j`, and :math:`p` is a success probability.
         
         * \"normal\", normal factor model:
-        .. math::
-            y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),    
-        where :math:`\sigma_j^2` is the residual variance for item :math:`j`, :math:`j = 1, \ldots, J`.
+        
+          .. math::
+              y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
+            
+          where :math:`y_j \in (-\infty, \infty)`,  :math:`\alpha_j` is the intercept
+          for item :math:`j`, :math:`\sigma_j^2` is the residual variance for item :math:`j`.
         
         * \"lognormal\", lognormal factor model:
-        .. math::
-            \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),    
-        where :math:`y_j > 0`, :math:`j = 1, \ldots, J`.
+        
+          .. math::
+              \ln y_j \mid \boldsymbol{x} \sim \mathcal{N}(\boldsymbol{\beta}_j^\top\boldsymbol{x} + \alpha_j, \sigma_j^2),
+            
+          where :math:`y_j > 0` and :math:`\alpha_j` is the intercept for item :math:`j`.
     latent_size : int
         Number of latent factors.
     n_cats : list of int and None, optional
@@ -196,11 +213,11 @@ class IWAVE(BaseEstimator):
 
         A length :math:`J` vector where :math:`J` is the number of items. Only applicable to
         negative binomial factor models.
-    cov : Tensor
+    cov : Tensor or None
         Factor covariance matrix.
 
         A :math:`D \times D` matrix where :math:`D` is the latent dimension.
-    mean : Tensor
+    mean : Tensor or None
         Factor mean vector.
 
         A length :math:`D` vector where :math:`D` is the latent dimension.

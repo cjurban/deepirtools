@@ -45,14 +45,24 @@ def screeplot(latent_sizes:             List[int],
         Measurement model type.
         
         Can either be a string if all items have same type or a list of strings
-        specifying each item type. Current options are:
+        specifying each item type.
+        
+        Current options are:
         
         * \"grm\", graded response model;
+
         * \"gpcm\", generalized partial credit model;
+
         * \"poisson\", poisson factor model;
+
         * \"negative_binomial\", negative binomial factor model;
+
         * \"normal\", normal factor model; and
+
         * \"lognormal\", lognormal factor model.
+        
+        See :obj:`~deepirtools.iwave.IWAVE` class documentation for further details
+        regarding each model type.
     test_size : float
         Proportion of data used for calculating LL. Range of values is :math:`(0, 1)`.
     inference_net_sizes_list : list of list of int, default = None

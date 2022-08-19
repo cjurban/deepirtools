@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 def load_grm():
-    """Return data-generating parameters and sampled data for a graded response model.
+    r"""Return data-generating parameters and sampled data for a graded response model.
     
     The generating model has four correlated latent factors and twelve items with
     three categories each.
