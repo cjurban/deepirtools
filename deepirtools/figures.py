@@ -39,7 +39,7 @@ def screeplot(latent_sizes:             List[int],
     data : Tensor
         Data set.
 
-        An :math:`\text{sample_size} \times \text{n_items}` matrix.
+        A :math:`\text{sample_size} \times \text{n_items}` matrix.
     model_type : str or list of str
         Measurement model type.
         

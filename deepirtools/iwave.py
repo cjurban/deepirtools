@@ -214,7 +214,7 @@ class IWAVE(BaseEstimator):
         the smallest category intercept is constrained to zero.
     use_spline_prior : bool, default = False
         Whether to use spline/spline coupling prior distribution for the
-        latent factors. [5]_
+        latent factors. [5]_ [6]_
     count_bins : int, optional
         Number of segments for each spline transformation.
     bound : float, optional
@@ -271,7 +271,7 @@ class IWAVE(BaseEstimator):
     References
     ----------
     .. [1] Urban, C. J., & Bauer, D. J. (2021). A deep learning algorithm for high-dimensional
-       exploratory item factor analysis. *Psychometrika*, *86* (1), 1-29.
+       exploratory item factor analysis. *Psychometrika*, *86* (1), 1--29.
        `https://link.springer.com/article/10.1007/s11336-021-09748-3
        <https://link.springer.com/article/10.1007/s11336-021-09748-3>`_
     
@@ -283,7 +283,7 @@ class IWAVE(BaseEstimator):
        <https://www.proquest.com/docview/2618877227/21C6C467D6194C1DPQ/>`_
     
     .. [3] Camilli, G., & Fox, J.-P. (2015). An aggregate IRT procedure for exploratory
-       factor analysis. *Journal of Educational and Behavioral Statistics*, *40*, 377–-401.
+       factor analysis. *Journal of Educational and Behavioral Statistics*, *40*, 377--401.
     
     .. [4] von Davier, M., & Sinharay, S. (2010). Stochastic approximation methods for
        latent regression item response models. *Journal of Educational and Behavioral
@@ -294,7 +294,13 @@ class IWAVE(BaseEstimator):
        `https://papers.nips.cc/paper/2019/hash/7ac71d433f282034e088473244df8c02-Abstract.html
        <https://papers.nips.cc/paper/2019/hash/7ac71d433f282034e088473244df8c02-Abstract.html>`_
        
-    .. [6] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
+    .. [6] Dolatabadi, H. M., Erfani, S., & Leckie, C. (2020). Invertible generative modeling
+       using linear rational splines. *Proceedings of the 23rd International Conference on
+       Artificial Intelligence and Statistics*, *108*, 4236--4246.
+       `http://proceedings.mlr.press/v108/dolatabadi20a
+       <http://proceedings.mlr.press/v108/dolatabadi20a>`_
+       
+    .. [7] Cremer, C., Morris, Q., & Duvenaud, D. (2017). Reinterpreting importance-weighted
        autoencoders. In 5th International Conference on Learning Representations. ICLR.
        `https://arxiv.org/abs/1704.02916 <https://arxiv.org/abs/1704.02916>`_.
        
@@ -522,7 +528,7 @@ class IWAVE(BaseEstimator):
         data : Tensor
             Data set.
 
-            An :math:`\text{sample_size} \times \text{n_items}` matrix.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         missing_mask : Tensor, default = None
             Binary mask indicating missing item responses.
 
@@ -540,7 +546,7 @@ class IWAVE(BaseEstimator):
 
             Increasing this decreases the EAP estimator's bias. When ``iw_samples > 1``, samples
             are drawn from the expected importance-weighted distribution using sampling-
-            importance-resampling. [6]_
+            importance-resampling. [7]_
         
         Returns
         _______

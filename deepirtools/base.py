@@ -139,7 +139,7 @@ class BaseEstimator():
         data : Tensor
             Data set.
 
-            An :math:`\text{sample_size} \times \text{n_items}` matrix.
+            A :math:`\text{sample_size} \times \text{n_items}` matrix.
         batch_size : int, default = 32
             Mini-batch size for stochastic gradient optimizer.
         missing_mask : Tensor, default = None
