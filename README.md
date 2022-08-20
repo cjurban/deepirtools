@@ -121,13 +121,13 @@ tensor([[1.0000, 0.1679, 0.1489, 0.2227],
         [0.1489, 0.1406, 1.0000, 0.1452],
         [0.2227, 0.2248, 0.1452, 1.0000]])
         
-In [10]: model.log_likelihood(data)
+In [10]: model.log_likelihood(data) # Approximate log-likelihood.
 
 Computing approx. LL
 Approx. LL computed in 3.81 seconds
 Out[10]: -11352.973602294922
 
-In [11]: model.scores(data)
+In [11]: model.scores(data) # Approximate factor scores.
 Out[11]: 
 tensor([[-0.6504, -0.1423,  0.7591, -1.7465],
         [ 0.7054, -1.0571, -0.0198, -2.4142],
