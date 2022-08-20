@@ -750,7 +750,7 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.theta.device)
         
         
-def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=4, bound=3.):
+def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=5.):
     """Modification of Pyro's spline_coupling() to use ELU activations."""
     
     if split_dim is None:
