@@ -42,13 +42,9 @@ DeepIRTools supports mixing item types, handling missing completely at random da
 
 ## Installation
 
-To install the latest stable version:
+To install the latest version:
 
 ``pip install deepirtools``
-
-To install the latest version on GitHub:
-
-``pip install git+https://github.com/cjurban/deepirtools``
 
 ## Documentation
 
