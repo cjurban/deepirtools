@@ -22,8 +22,8 @@ def screeplot(latent_sizes:             List[int],
               iw_samples_fit:           int = 1,
               iw_samples_ll:            int = 5000,
               random_seed:              int = 1,
-              xlabel:                   str = "Number of Factors",
-              ylabel:                   str = "Predicted Approximate Negative Log-Likelihood",
+              xlab:                     str = "Number of Factors",
+              ylab:                     str = "Predicted Approximate Negative Log-Likelihood",
               title:                    str = "Approximate Log-Likelihood Scree Plot",
               **model_kwargs,          
              ):
@@ -106,9 +106,9 @@ def screeplot(latent_sizes:             List[int],
         Number of importance-weighted samples for calculating approximate log-likelihoods.
     random_seed : int, default = 1
         Seed for reproducibility.
-    xlabel : str, default = "Number of Factors"
+    xlab : str, default = "Number of Factors"
         Screeplot x-axis label.
-    ylabel : str, default = "Predicted Approximate Negative Log-Likelihood"
+    ylab : str, default = "Predicted Approximate Negative Log-Likelihood"
         Screeplot y-axis label.
     title : str, default = "Approximate Log-Likelihood Scree Plot"
         Screeplot title.
@@ -249,8 +249,8 @@ def screeplot(latent_sizes:             List[int],
     ax.plot(latent_sizes, [-ll for ll in ll_list], "k-o")
     
     ax.set_xticks(np.arange(min(latent_sizes) - 1, max(latent_sizes) + 2).tolist())
-    ax.set_ylabel(ylabel)
-    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylab)
+    ax.set_xlabel(xlab)
     fig.suptitle(title)
 
     fig.savefig("screeplot.pdf")
@@ -260,8 +260,8 @@ def screeplot(latent_sizes:             List[int],
 
     
 def loadings_heatmap(loadings: torch.Tensor,
-                     xlabel:   str = "Factor", 
-                     ylabel:   str = "Item", 
+                     xlab:     str = "Factor", 
+                     ylab:     str = "Item", 
                      title:    str = "Factor Loadings"):
     """Make heatmap of factor loadings.
     
@@ -271,9 +271,9 @@ def loadings_heatmap(loadings: torch.Tensor,
     __________
     loadings : Tensor
         Factor loadings matrix.
-    xlabel : str, default = "Factor"
+    xlab : str, default = "Factor"
         Heatmap x-axis label.
-    ylabel : str, default = "Item"
+    ylab : str, default = "Item"
         Heatmap y-axis label.
     title : str, default = "Factor Loadings"
         Heatmap title.
@@ -285,8 +285,8 @@ def loadings_heatmap(loadings: torch.Tensor,
     set_cmap("gray_r")
     colorbar() 
     c = pcolor(invert_factors(loadings), edgecolors = "w", linewidths = 1, vmin = 0) 
-    xlabel(xlabel)
-    ylabel(ylabel)
+    xlabel(xlab)
+    ylabel(ylab)
     xticks(np.arange(latent_size) + 0.5,
            [str(size + 1) for size in range(latent_size)])
     ytick_vals = [int(10 * (size + 1)) for size in range(latent_size)]
