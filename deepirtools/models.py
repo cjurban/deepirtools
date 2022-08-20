@@ -750,14 +750,11 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.theta.device)
         
         
-def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, bound=5.):
-    """Modification of Pyro's spline_coupling() to use ELU activations."""
+def spline_coupling(input_dim, count_bins=32, bound=5.):
+    """Modification of Pyro's spline_coupling()."""
     
-    if split_dim is None:
-        split_dim = input_dim // 2
-
-    if hidden_dims is None:
-        hidden_dims = [input_dim * 10, input_dim * 10]
+    split_dim = input_dim // 2
+    hidden_dims = [min(100, input_dim * 10)]
 
     net = DenseNN(
         split_dim,
@@ -771,7 +768,7 @@ def spline_coupling(input_dim, split_dim=None, hidden_dims=None, count_bins=16, 
         nonlinearity=nn.ELU(),
     )
 
-    return T.SplineCoupling(input_dim, split_dim, net, count_bins, bound, order = "quadratic")
+    return T.SplineCoupling(input_dim, split_dim, net, count_bins, bound)
 
         
 ################################################################################
@@ -824,11 +821,11 @@ class VariationalAutoencoder(nn.Module):
         assert(len(kwargs) == 0), "Unused arguments: " + ", ".join([k for k in kwargs])
         if use_spline_prior:
             if latent_size == 1:
-                self.flow = T.Spline(1, order = "quadratic", **spline_kwargs)
+                self.flow = T.Spline(1, **spline_kwargs)
             else:
-                self.flow1 = T.spline_coupling(latent_size, **spline_kwargs)
+                self.flow1 = spline_coupling(latent_size, **spline_kwargs)
                 self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
-                self.flow3 = T.spline_coupling(latent_size, **spline_kwargs)
+                self.flow3 = spline_coupling(latent_size, **spline_kwargs)
         else:
             self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors)
             if not fixed_means:
