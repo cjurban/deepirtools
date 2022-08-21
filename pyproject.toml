@@ -4,8 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepirtools"
-version = "0.1.0"
+version = "2.0.1"
+readme = "README.md"
 description = "Deep learning-based estimation and inference for item response theory models."
+keywords = ["deep learning", "item response theory", "factor analysis"]
 dependencies = [
     'torch',
     'pyro-ppl',
