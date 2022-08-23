@@ -750,7 +750,7 @@ class Spherical(nn.Module):
             return torch.eye(self.size, device=self.theta.device)
         
         
-def spline_coupling(input_dim, count_bins=32, bound=5.):
+def spline_coupling(input_dim, count_bins=16, bound=5.):
     """Modification of Pyro's spline_coupling()."""
     
     split_dim = input_dim // 2
@@ -858,9 +858,9 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
-            for _ in range(1000):
+            for _ in range(2000):
                 self.zero_grad()
-                x = torch.randn([128, self.latent_size], device = device)
+                x = torch.randn([512, self.latent_size], device = device)
                 loss = -px.log_prob(x).mean()
                 loss.backward()
                 optimizer.step()
@@ -922,12 +922,12 @@ class VariationalAutoencoder(nn.Module):
         if self.use_spline_prior:
             base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
             flow = self.__get_flow()
-            if self.fixed_variances:
-                scale = x.var(dim = -2, keepdim = True).add(EPS).sqrt().pow(-1)
+            if self.fixed_variances and self.training:
+                scale = x.std(dim = -2, keepdim = True)
             else:
                 scale = torch.ones_like(x, device = x.device)
-            if self.fixed_means:
-                loc = -x.mean(dim = -2, keepdim = True) * scale
+            if self.fixed_means and self.training:
+                loc = x.mean(dim = -2, keepdim = True)
             else:
                 loc = torch.zeros_like(x, device = x.device)
             flow.append(T.AffineTransform(loc = loc, scale = scale))
