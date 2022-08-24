@@ -143,8 +143,12 @@ class IWAVE(BaseEstimator):
         inference model with two hidden layers of size 100.
     fixed_variances : bool, default = True
         Whether to constrain variances of latent factors to one.
+        
+        Only applicable when ``use_spline_prior = False``.
     fixed_means : bool, default = True
         Whether to constrain means of latent factors to zero.
+        
+        Only applicable when ``use_spline_prior = False``.
     correlated_factors : list of int, default = []
         Which latent factors should be correlated.
         

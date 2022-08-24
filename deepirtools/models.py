@@ -813,6 +813,9 @@ class VariationalAutoencoder(nn.Module):
         self.cov_size = covariate_size
         
         # Latent prior.
+        assert(not ((fixed_variances or fixed_means) and use_spline_prior)), ("Fixed factor variances and/or means ",
+                                                                              "not supported with spline/spline ",
+                                                                              "coupling prior.")
         assert(not (covariate_size > 0 and use_spline_prior)), ("Latent regression not supported with ",
                                                                 "spline/spline coupling prior.")
         assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
@@ -844,7 +847,7 @@ class VariationalAutoencoder(nn.Module):
         nn.init.normal_(self.inf_net.layers[-1].bias[0:self.latent_size], mean=0., std=0.001)
         nn.init.normal_(self.inf_net.layers[-1].bias[self.latent_size:], mean=math.log(math.exp(1) - 1), std=0.001)
         
-        if not self.fixed_means:
+        if not self.fixed_means and not self.use_spline_prior:
             nn.init.normal_(self.mean, mean=0., std=0.001)
         
         if self.cov_size > 0:
@@ -858,7 +861,7 @@ class VariationalAutoencoder(nn.Module):
             base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
                                       torch.ones([1, self.latent_size], device = device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
-            for _ in range(2000):
+            for _ in range(1000):
                 self.zero_grad()
                 x = torch.randn([512, self.latent_size], device = device)
                 loss = -px.log_prob(x).mean()
@@ -904,6 +907,8 @@ class VariationalAutoencoder(nn.Module):
                ):
         """Compute evidence lower bound (ELBO)."""
         
+        batch_size = y.shape[0]
+        
         if self.cov_size > 0:
             try:
                 _y = torch.cat((y, covariates), dim = 1)
@@ -920,18 +925,9 @@ class VariationalAutoencoder(nn.Module):
         
         # Log p(x | covariates).
         if self.use_spline_prior:
-            base_dist = pydist.Normal(torch.zeros_like(x, device = x.device), torch.ones_like(x, device = x.device))
-            flow = self.__get_flow()
-            if self.fixed_variances and self.training:
-                scale = x.std(dim = -2, keepdim = True)
-            else:
-                scale = torch.ones_like(x, device = x.device)
-            if self.fixed_means and self.training:
-                loc = x.mean(dim = -2, keepdim = True)
-            else:
-                loc = torch.zeros_like(x, device = x.device)
-            flow.append(T.AffineTransform(loc = loc, scale = scale))
-            px = pydist.TransformedDistribution(base_dist, flow)
+            base_dist = pydist.Normal(torch.zeros_like(x, device = x.device),
+                                      torch.ones_like(x, device = x.device))
+            px = pydist.TransformedDistribution(base_dist, self.__get_flow())
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
             if self.cov_size > 0:
