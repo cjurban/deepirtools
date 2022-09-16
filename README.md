@@ -8,7 +8,7 @@
 [![Documentation Status](https://readthedocs.org/projects/deepirtools/badge/?version=latest)](https://deepirtools.readthedocs.io/en/latest/?badge=latest)
 [![python_sup](https://img.shields.io/badge/python-3.7+-black.svg?)](https://www.python.org/downloads/release/python-370/)
 
-DeepIRTools is a small Pytorch-based Python package that uses scalable deep learning methods to fit a number of different confirmatory and exploratory latent factors models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available for most computations.
+DeepIRTools is a small Pytorch-based Python package that uses scalable deep learning methods to fit a number of different confirmatory and exploratory latent factor models, with a particular focus on item response theory (IRT) models. Graphics processing unit (GPU) support is available for most computations.
 
 </div>
 

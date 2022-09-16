@@ -6,7 +6,7 @@ from torch.optim import Adam
 import pyro.distributions as pydist
 import pyro.distributions.transforms as T
 from pyro.nn import DenseNN
-from deepirtools.utils import get_thresholds
+from deepirtools.utils import get_thresholds, multi_categorical_maker
 from deepirtools.settings import EPS
 from typing import List, Optional, Union
 from operator import itemgetter
@@ -175,10 +175,27 @@ class GradedBaseModel(nn.Module):
         if not self._no_loadings:
             if self.Q is None and self.A is None:
                 nn.init.xavier_uniform_(self._loadings.weight)
+                
+    def conditional_mean(self):
+        """Conditional mean function."""
+        
+        raise NotImplementedError
 
     def forward(self):
         """Compute log p(data | latents)."""
+        
         raise NotImplementedError
+        
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+               loadings: Optional[torch.Tensor] = None,
+              ):
+        cond_mean = self.conditional_mean(x = x, loadings = loadings)
+        cond_mean = torch.cat([cond_mean[..., idx, :] for
+                               idx in range(cond_mean.shape[-2])], dim=-1)
+        py_x = multi_categorical_maker(self.n_cats)(probs = cond_mean)
+        return py_x.sample()
         
     @property
     def loadings(self):
@@ -206,13 +223,11 @@ class GradedResponseModel(GradedBaseModel):
                 ):
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
-
-    def forward(self,
-                x:        torch.Tensor,
-                y:        torch.Tensor,
-                mask:     Optional[torch.Tensor] = None,
-                loadings: Optional[torch.Tensor] = None,
-               ):
+        
+    def conditional_mean(self,
+                         x:        torch.Tensor,
+                         loadings: Optional[torch.Tensor] = None,
+                        ):
         if loadings is None:
             Bx = self._loadings(x)
         else:
@@ -221,8 +236,15 @@ class GradedResponseModel(GradedBaseModel):
                                                              torch.Size([max(self.n_cats) - 1]))).sigmoid()
         upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
         lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
-        probs = upper_probs - lower_probs
-        
+        return upper_probs - lower_probs
+
+    def forward(self,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
+               ):
+        probs = self.conditional_mean(x = x, loadings = loadings)
         idxs = y.long().expand(probs[..., -1].shape).unsqueeze(-1)
         log_py_x = -(torch.gather(probs, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log()
         if mask is not None:
@@ -244,13 +266,12 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
                 ):
         super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
                          ints_mask = ints_mask, _no_loadings = _no_loadings)
-
-    def forward(self,
-                x:        torch.Tensor,
-                y:        torch.Tensor,
-                mask:     Optional[torch.Tensor] = None,
-                loadings: Optional[torch.Tensor] = None,
-               ):
+        
+    def conditional_mean(self,
+                      x:        torch.Tensor,
+                      loadings: Optional[torch.Tensor] = None,
+                      log_mean: bool = False
+                     ):
         M = max(self.n_cats)
         
         if loadings is None:
@@ -263,9 +284,19 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         cum_bias = self._intercepts._bias.mul(self._intercepts.ints_mask).cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
         tmp = kBx - cum_bias
-        
         log_py_x = tmp - (tmp).logsumexp(dim = -1, keepdim = True)
         
+        if log_mean:
+            return log_py_x
+        return log_py_x.exp()
+
+    def forward(self,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
+               ):
+        log_py_x = self.conditional_mean(x = x, loadings = loadings, log_mean = True)
         idxs = y.long().expand(log_py_x[..., -1].shape).unsqueeze(-1)
         log_py_x = -torch.gather(log_py_x, dim = -1, index = idxs).squeeze(-1)
         if mask is not None:
@@ -318,9 +349,24 @@ class NonGradedBaseModel(nn.Module):
                 nn.init.xavier_uniform_(self._loadings.weight)
         nn.init.normal_(self._bias, mean=0., std=0.001)
         
+    def conditional_mean(self,
+                      x:        torch.Tensor,
+                      loadings: Optional[torch.Tensor] = None,
+                     ):
+        """Conditional mean function."""
+        
+        if loadings is None:
+            return self._loadings(x) + self.bias
+        else:
+            return F.linear(x, loadings, self.bias)
+        
     def forward(self):
         """Compute log p(data | latents)."""
         
+        raise NotImplementedError
+        
+    @torch.no_grad()
+    def sample(self):
         raise NotImplementedError
         
     @property
@@ -363,15 +409,20 @@ class PoissonFactorModel(NonGradedBaseModel):
                 mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
-        if loadings is None:
-            log_rate = self._loadings(x) + self.bias
-        else:
-            log_rate = F.linear(x, loadings, self.bias)
-        
+        log_rate = self.conditional_mean(x = x, loadings = loadings)
         py_x = pydist.Poisson( # Clamp for numerical stability.
             rate = log_rate.clamp(min = math.log(EPS), max = -math.log(EPS)).exp(),
         )
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+               loadings: Optional[torch.Tensor] = None,
+              ):
+        log_rate = self.conditional_mean(x = x, loadings = loadings)
+        py_x = pydist.Poisson(rate = log_rate.exp())
+        return py_x.sample()
     
     
 class NegativeBinomialFactorModel(NonGradedBaseModel):
@@ -402,16 +453,21 @@ class NegativeBinomialFactorModel(NonGradedBaseModel):
                 mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
-        if loadings is None:
-            log_total_count = self._loadings(x) + self.bias
-        else:
-            log_total_count = F.linear(x, loadings, self.bias)
-        
+        log_total_count = self.conditional_mean(x = x, loadings = loadings)
         py_x = pydist.NegativeBinomial( # Clamp for numerical stability.
             total_count = log_total_count.clamp(min = math.log(EPS), max = -math.log(EPS)).exp(),
             logits = self.logits,
         )
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+               loadings: Optional[torch.Tensor] = None,
+              ):
+        log_total_count = self.conditional_mean(x = x, loadings = loadings)
+        py_x = pydist.NegativeBinomial(total_count = log_total_count.exp(), logits = self.logits)
+        return py_x.sample()
     
     
 class NormalFactorModel(NonGradedBaseModel):
@@ -442,13 +498,18 @@ class NormalFactorModel(NonGradedBaseModel):
                 mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
-        if loadings is None:
-            loc = self._loadings(x) + self.bias
-        else:
-            loc = F.linear(x, loadings, self.bias)
-        
+        loc = self.conditional_mean(x = x, loadings = loadings)
         py_x = pydist.Normal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+               loadings: Optional[torch.Tensor] = None,
+              ):
+        loc = self.conditional_mean(x = x, loadings = loadings)
+        py_x = pydist.Normal(loc = loc, scale = self.residual_std)
+        return py_x.sample()
     
     @property
     def residual_std(self):
@@ -483,13 +544,18 @@ class LogNormalFactorModel(NonGradedBaseModel):
                 mask:     Optional[torch.Tensor] = None,
                 loadings: Optional[torch.Tensor] = None,
                ):
-        if loadings is None:
-            loc = self._loadings(x) + self.bias
-        else:
-            loc = F.linear(x, loadings, self.bias)
-        
+        loc = self.conditional_mean(x = x, loadings = loadings)
         py_x = pydist.LogNormal(loc = loc, scale = self.residual_std)
         return -py_x.log_prob(y).sum(-1, keepdim = True)
+    
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+               loadings: Optional[torch.Tensor] = None,
+              ):
+        loc = self.conditional_mean(x = x, loadings = loadings)
+        py_x = pydist.LogNormal(loc = loc, scale = self.residual_std)
+        return py_x.sample()
     
     @property
     def residual_std(self):
@@ -609,6 +675,25 @@ class MixedFactorModel(nn.Module):
                                               loadings = _ldgs_sorted))
         
         return torch.cat(out, dim = -1).sum(-1, keepdim = True)
+    
+    @torch.no_grad()
+    def sample(self,
+               x:        torch.Tensor,
+              ):
+        ldgs_sorted = self._loadings.weight[self.sorted_idxs]
+        
+        out = []
+        for model_idx, (idx1, idx2) in enumerate(zip(self.cum_idxs[:-1], self.cum_idxs[1:])):
+            keep_idx = self.keep_idxs[model_idx]
+            if keep_idx.sum().gt(0):
+                _ldgs_sorted = ldgs_sorted[idx1:idx2, keep_idx]
+                _x = x[..., keep_idx]
+            else: # Intercepts-only model.
+                _ldgs_sorted = torch.zeros([idx2 - idx1, 1])
+                _x = torch.zeros(x.size()[:-1] + torch.Size([1]))
+            out.append(self.models[model_idx].sample(x = _x, loadings = _ldgs_sorted))
+            
+        return torch.cat(out, dim = -1)[..., self.unsorted_idxs]
     
     @property
     def loadings(self):
@@ -790,6 +875,8 @@ class VariationalAutoencoder(nn.Module):
                  correlated_factors:    List[int] = [],
                  covariate_size:        int = 0,
                  use_spline_prior:      bool = False,
+                 flow_length:           int = 2,
+                 spline_net_sizes:      List[int] = [100],
                  **kwargs,
                 ):
         super(VariationalAutoencoder, self).__init__()
@@ -808,16 +895,17 @@ class VariationalAutoencoder(nn.Module):
                                [int(2 * latent_size)], nonlinearity = nn.ELU())
         
         # Latent regression.
-        if covariate_size > 0:
+        if covariate_size > 0 and not use_spline_prior:
             self.lreg_weight = nn.Parameter(torch.empty([latent_size, covariate_size]))
+        elif covariate_size > 0 and use_spline_prior:
+            self.spline_net = DenseNN(covariate_size, spline_net_sizes,
+                                      [latent_size], nonlinearity = nn.ELU())
         self.cov_size = covariate_size
         
         # Latent prior.
         assert(not ((fixed_variances or fixed_means) and use_spline_prior)), ("Fixed factor variances and/or means ",
                                                                               "not supported with spline/spline ",
                                                                               "coupling prior.")
-        assert(not (covariate_size > 0 and use_spline_prior)), ("Latent regression not supported with ",
-                                                                "spline/spline coupling prior.")
         assert(not (correlated_factors != [] and use_spline_prior)), ("Cannot constrain factor correlations ",
                                                                       "with spline/spline coupling prior.")
         spline_kwargs = {k: kwargs.pop(k) for k in dict(kwargs) if k in ["count_bins", "bound"]}
@@ -826,9 +914,10 @@ class VariationalAutoencoder(nn.Module):
             if latent_size == 1:
                 self.flow = T.Spline(1, **spline_kwargs)
             else:
-                self.flow1 = spline_coupling(latent_size, **spline_kwargs)
-                self.flow2 = T.Permute(torch.Tensor(list(reversed(range(latent_size)))).long())
-                self.flow3 = spline_coupling(latent_size, **spline_kwargs)
+                self.flows = nn.ModuleList([
+                    spline_coupling(latent_size, **spline_kwargs) for _ in range(flow_length)
+                ])
+                self.register_buffer("perm", torch.Tensor(list(reversed(range(latent_size)))).long())
         else:
             self.cholesky = Spherical(latent_size, fixed_variances, correlated_factors)
             if not fixed_means:
@@ -850,7 +939,7 @@ class VariationalAutoencoder(nn.Module):
         if not self.fixed_means and not self.use_spline_prior:
             nn.init.normal_(self.mean, mean=0., std=0.001)
         
-        if self.cov_size > 0:
+        if self.cov_size > 0 and not self.use_spline_prior:
             nn.init.normal_(self.lreg_weight, mean=0., std=0.001)
         
         if self.use_spline_prior:
@@ -868,13 +957,18 @@ class VariationalAutoencoder(nn.Module):
                 loss.backward()
                 optimizer.step()
                 px.clear_cache()
+                
+            if self.cov_size > 0:
+                nn.init.normal_(self.spline_net.layers[-1].weight, mean=0., std=0.001)
+                nn.init.normal_(self.spline_net.layers[-1].bias, mean=0., std=0.001)
         
     def __get_flow(self):
         if self.use_spline_prior:
             if self.latent_size == 1:
                 return [self.flow]
             else:
-                return [self.flow1, self.flow2, self.flow3]
+                return list(itertools.chain.from_iterable(
+                    (flow, T.Permute(self.perm)) for flow in self.flows[:-1])) + [self.flows[-1]] 
         return None
 
     def encode(self,
@@ -925,8 +1019,11 @@ class VariationalAutoencoder(nn.Module):
         
         # Log p(x | covariates).
         if self.use_spline_prior:
-            base_dist = pydist.Normal(torch.zeros_like(x, device = x.device),
-                                      torch.ones_like(x, device = x.device))
+            if self.cov_size > 0:
+                loc = self.spline_net(covariates)
+            else:
+                loc = torch.zeros_like(x, device = x.device)
+            base_dist = pydist.Normal(loc, torch.ones_like(x, device = x.device))
             px = pydist.TransformedDistribution(base_dist, self.__get_flow())
             log_px = px.log_prob(x).unsqueeze(-1)
         else:
@@ -950,3 +1047,41 @@ class VariationalAutoencoder(nn.Module):
         
         elbo = log_py_x + log_qx_y - log_px
         return elbo, x
+    
+    @torch.no_grad()
+    def sample(self,
+               sample_size:   int,
+               covariates:    Optional[torch.Tensor] = None,
+               return_scores: bool = False,
+              ):
+        """Sample from model."""
+        device = self.inf_net.layers[-1].weight.device
+        
+        assert((self.cov_size > 0) == (covariates is not None)), ("Covariates must be passed to sample()",
+                                                                  "when covariate_size > 0.")
+        if self.use_spline_prior:
+            if self.cov_size > 0:
+                loc = self.spline_net(covariates)
+            else:
+                loc = torch.zeros([sample_size, self.latent_size], device = device)
+            base_dist = pydist.Normal(loc, torch.ones([sample_size, self.latent_size], device = device))
+            px = pydist.TransformedDistribution(base_dist, self.__get_flow())
+        else:
+            if self.cov_size > 0:
+                loc = F.linear(covariates, self.lreg_weight)
+            else:
+                loc = torch.zeros([sample_size, self.latent_size], device = device)
+            if not self.fixed_means:
+                loc.add_(self.mean)
+            if self.cholesky.model_correlations:
+                px = pydist.MultivariateNormal(loc, scale_tril = self.cholesky.weight)
+            else:
+                px = pydist.Normal(loc, scale = self.cholesky.cov.diag().sqrt().view(1, -1))
+                
+        x = px.sample()
+        y = self.decoder.sample(x)
+            
+        if return_scores:
+            return y, x
+        else:
+            return y, None

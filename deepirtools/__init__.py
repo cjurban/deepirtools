@@ -8,4 +8,4 @@ from .utils import (manual_seed,
 from .figures import screeplot, loadings_heatmap
 from .data import load_grm
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"

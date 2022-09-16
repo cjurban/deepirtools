@@ -219,6 +219,10 @@ class IWAVE(BaseEstimator):
     use_spline_prior : bool, default = False
         Whether to use spline/spline coupling prior distribution for the
         latent factors. [5]_ [6]_
+    flow_length : int, default = 2
+        Number of spline coupling flow layers.
+        
+        Only applicable when ``latent_size > 1``.
     count_bins : int, optional
         Number of segments for each spline transformation.
     bound : float, optional
@@ -580,6 +584,34 @@ class IWAVE(BaseEstimator):
             idxs = idxs.expand(x[-1, ...].shape).unsqueeze(0).long()
             scores.append(torch.gather(x, axis = 0, index = idxs).squeeze(0).mean(dim = 0))                  
         return torch.cat(scores, dim = 0).cpu()
+    
+    @torch.no_grad()
+    def sample(self,
+               sample_size:   int,
+               covariates:    Optional[torch.Tensor] = None,
+               return_scores: bool = False,
+              ):
+        r"""Sample from model.
+        
+        Parameters
+        __________
+        sample_size : int
+            Number of observations to sample.
+        covariates : Tensor, default = None
+            Matrix of covariates.
+
+            A :math:`\text{sample_size} \times \text{covariate_size}` matrix.
+        return_scores : bool, default = False
+            Whether to reture sampled factor scores in addition to item responses.
+        
+        Returns
+        _______
+        samples : dict
+            Sampled observations and factor scores.
+        """
+        y, x = self.model.sample(sample_size = sample_size, covariates = covariates,
+                                 return_scores = return_scores)
+        return {"obs" : y, "scores" : x}
         
     @property
     def loadings(self):

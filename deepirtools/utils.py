@@ -3,6 +3,7 @@ import math
 import torch
 from torch import nn
 from torch.utils.data import Dataset
+from pyro.distributions import Categorical, Distribution
 import numpy as np
 from typing import List, Optional
 from itertools import chain
@@ -43,10 +44,10 @@ class ConvergenceChecker():
                 if self.loss_improvement_counter >= self.n_intervals:
                     self.converged = True
         if (global_step - 1) % self.log_interval == 0:
-            print("\rEpoch = {:7d}".format(epoch),
-                  "Iter. = {:6d}".format(global_step),
+            print("\rEpoch = {:8d}".format(epoch),
+                  "Iter. = {:8d}".format(global_step),
                   "Cur. loss = {:7.2f}".format(loss),
-                  "  Intervals no change = {:3d}".format(self.loss_improvement_counter),
+                  "  Intervals no change = {:4d}".format(self.loss_improvement_counter),
                   end = "")
 
 
@@ -223,7 +224,42 @@ def normalize_ints(ints:   torch.Tensor,
                      dim = 0)
     
     
+class MultiCategorical(Distribution):
+    """
+    Multiple categorical distributions.
+    https://github.com/pytorch/pytorch/issues/43250
+    """
+
+    def __init__(self, dists: List[Categorical]):
+        super().__init__()
+        self.dists = dists
+
+    def log_prob(self, value):
+        ans = []
+        for d, v in zip(self.dists, torch.split(value, 1, dim=-1)):
+            ans.append(d.log_prob(v.squeeze(-1)))
+        return torch.stack(ans, dim=-1).sum(dim=-1)
+
+    def entropy(self):
+        return torch.stack([d.entropy() for d in self.dists], dim=-1).sum(dim=-1)
+
+    def sample(self, sample_shape=torch.Size()):
+        return torch.stack([d.sample(sample_shape) for d in self.dists], dim=-1)
+
+
+def multi_categorical_maker(nvec):
+    def get_multi_categorical(probs):
+        start = 0
+        ans = []
+        for n in nvec:
+            ans.append(Categorical(probs=probs[..., start: start + n]))
+            start += n
+        return MultiCategorical(ans)
+    return get_multi_categorical
+    
+    
 class tensor_dataset(Dataset):
+    
     def __init__(self,
                  data,
                  mask = None,
