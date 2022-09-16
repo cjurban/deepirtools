@@ -4,7 +4,7 @@ deepirtools package
 :py:mod:`deepirtoools.iwave` Module
 -------------------------------------
 .. autoclass:: deepirtools.iwave.IWAVE
-    :members: fit, log_likelihood, scores, save_model, load_model
+    :members: fit, log_likelihood, sample, scores, save_model, load_model
 
 :py:mod:`deepirtoools.data` Module
 -------------------------------------

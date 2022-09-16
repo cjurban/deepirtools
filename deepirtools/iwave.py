@@ -37,7 +37,7 @@ class IWAVE(BaseEstimator):
                   &\text{Pr}(y_j = k \mid \mathbf{x}) \\
                   &=
                   \begin{cases}
-                      1 - \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
+                      1 - \sigma(\alpha_{j,k + 1} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = 0$} \\
                       \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}) - \sigma(\alpha_{j,k+1} +
                       \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k \in \{1, \ldots, K_j - 2\}$},\\
                       \sigma(\alpha_{j,k} + \boldsymbol{\beta}_j^\top \mathbf{x}), & \text{if $k = K_j - 1$},
