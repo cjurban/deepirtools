@@ -609,6 +609,7 @@ class IWAVE(BaseEstimator):
         samples : dict
             Sampled observations and factor scores.
         """
+        
         y, x = self.model.sample(sample_size = sample_size, covariates = covariates,
                                  return_scores = return_scores)
         return {"obs" : y, "scores" : x}
