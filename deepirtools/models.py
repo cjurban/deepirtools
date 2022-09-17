@@ -279,7 +279,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         else:
             Bx = F.linear(x, loadings)
         shape = Bx.shape + torch.Size([M])
-        kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M)
+        kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M, device = x.device)
         
         cum_bias = self._intercepts._bias.mul(self._intercepts.ints_mask).cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
