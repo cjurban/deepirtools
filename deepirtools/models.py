@@ -689,8 +689,8 @@ class MixedFactorModel(nn.Module):
                 _ldgs_sorted = ldgs_sorted[idx1:idx2, keep_idx]
                 _x = x[..., keep_idx]
             else: # Intercepts-only model.
-                _ldgs_sorted = torch.zeros([idx2 - idx1, 1])
-                _x = torch.zeros(x.size()[:-1] + torch.Size([1]))
+                _ldgs_sorted = torch.zeros([idx2 - idx1, 1], device = x.device)
+                _x = torch.zeros(x.size()[:-1] + torch.Size([1]), device = x.device)
             out.append(self.models[model_idx].sample(x = _x, loadings = _ldgs_sorted))
             
         return torch.cat(out, dim = -1)[..., self.unsorted_idxs]
@@ -716,7 +716,8 @@ class MixedFactorModel(nn.Module):
                 try:
                     residual_stds.append(m.residual_std)
                 except AttributeError:
-                    residual_stds.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
+                    residual_stds.append(torch.zeros(m.intercepts.shape[0],
+                                                     device = m.intercepts.device) * float("nan"))
             residual_std = torch.cat(residual_stds, dim = 0)[self.unsorted_idxs]
             assert(~residual_std.isnan().all())
             return residual_std
@@ -731,7 +732,8 @@ class MixedFactorModel(nn.Module):
                 try:
                     logits_list.append(m.logits)
                 except AttributeError:
-                    logits_list.append(torch.zeros(m.intercepts.shape[0]) * float("nan"))
+                    logits_list.append(torch.zeros(m.intercepts.shape[0],
+                                                   device = m.intercepts.device) * float("nan"))
             logits = torch.cat(logits_list, dim = 0)[self.unsorted_idxs]
             assert(~logits.isnan().all())
             return logits
