@@ -624,7 +624,7 @@ class MixedFactorModel(nn.Module):
         keep_idxs = []
         models = []
         for model_idx, (idx1, idx2) in enumerate(zip(self.cum_idxs[:-1], self.cum_idxs[1:])):
-            keep_idx = check_mat[idx1:idx2].sum(dim = 0).gt(0)
+            keep_idx = check_mat[idx1:idx2].abs().sum(dim = 0).gt(0)
             keep_idxs.append(keep_idx)
             if ints_mask is not None:
                 assert(len(ints_mask.shape) == 1), "ints_mask must be 1D."
@@ -664,8 +664,8 @@ class MixedFactorModel(nn.Module):
                 _ldgs_sorted = ldgs_sorted[idx1:idx2, keep_idx]
                 _x = x[..., keep_idx]
             else: # Intercepts-only model.
-                _ldgs_sorted = torch.zeros([idx2 - idx1, 1])
-                _x = torch.zeros(x.size()[:-1] + torch.Size([1]))
+                _ldgs_sorted = torch.zeros([idx2 - idx1, 1], device = x.device)
+                _x = torch.zeros(x.size()[:-1] + torch.Size([1]), device = x.device)
             _y_sorted = y_sorted[:, idx1:idx2]
             if mask is not None:
                 _mask_sorted = mask_sorted[:, idx1:idx2]
