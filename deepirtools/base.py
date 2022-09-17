@@ -187,7 +187,8 @@ class BaseEstimator():
         self.timerecords["fit"] = stop - start
         if self.verbose:
             print("\nFitting ended in ", round(stop - start, 2), " seconds", end = "\n")
-        
+    
+    @torch.no_grad()
     def save_model(self,
                    model_name: str,
                    save_path:  str,
@@ -202,9 +203,8 @@ class BaseEstimator():
             Where to save fitted model.
         """
         
-        with torch.no_grad():
-            torch.save(self.model.state_dict(), 
-                       os.path.join(save_path, model_name) + ".pth")
+        torch.save(self.model.state_dict(), 
+                   os.path.join(save_path, model_name) + ".pth")
 
     def load_model(self,
                    model_name: str,
@@ -223,4 +223,5 @@ class BaseEstimator():
             Where to load fitted model from.
         """
         
-        self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth"))
+        self.model.load_state_dict(torch.load(os.path.join(load_path, model_name) + ".pth",
+                                              map_location = self.device))

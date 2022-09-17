@@ -877,6 +877,7 @@ class VariationalAutoencoder(nn.Module):
                  use_spline_prior:      bool = False,
                  flow_length:           int = 2,
                  spline_net_sizes:      List[int] = [100],
+                 spline_init_normal:    bool = True,
                  **kwargs,
                 ):
         super(VariationalAutoencoder, self).__init__()
@@ -928,6 +929,7 @@ class VariationalAutoencoder(nn.Module):
         self.fixed_variances = fixed_variances
         self.fixed_means = fixed_means
         self.use_spline_prior = use_spline_prior
+        self.spline_init_normal = spline_init_normal
         
         self.reset_parameters()
         
@@ -943,20 +945,21 @@ class VariationalAutoencoder(nn.Module):
             nn.init.normal_(self.lreg_weight, mean=0., std=0.001)
         
         if self.use_spline_prior:
-            device = self.inf_net.layers[0].weight.device
-            params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
-            lr = (0.1 / (self.latent_size + 1))*5**-1
-            optimizer = Adam([{"params" : itertools.chain(*params)}], lr = lr, amsgrad = True)
-            base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
-                                      torch.ones([1, self.latent_size], device = device))
-            px = pydist.TransformedDistribution(base_dist, self.__get_flow())
-            for _ in range(1000):
-                self.zero_grad()
-                x = torch.randn([512, self.latent_size], device = device)
-                loss = -px.log_prob(x).mean()
-                loss.backward()
-                optimizer.step()
-                px.clear_cache()
+            if self.spline_init_normal:
+                device = self.inf_net.layers[0].weight.device
+                params = [p.parameters() for p in self.__get_flow() if hasattr(p, "parameters")]
+                lr = (0.1 / (self.latent_size + 1))*5**-1
+                optimizer = Adam([{"params" : itertools.chain(*params)}], lr = lr, amsgrad = True)
+                base_dist = pydist.Normal(torch.zeros([1, self.latent_size], device = device),
+                                          torch.ones([1, self.latent_size], device = device))
+                px = pydist.TransformedDistribution(base_dist, self.__get_flow())
+                for _ in range(1000):
+                    self.zero_grad()
+                    x = torch.randn([512, self.latent_size], device = device)
+                    loss = -px.log_prob(x).mean()
+                    loss.backward()
+                    optimizer.step()
+                    px.clear_cache()
                 
             if self.cov_size > 0:
                 nn.init.normal_(self.spline_net.layers[-1].weight, mean=0., std=0.001)

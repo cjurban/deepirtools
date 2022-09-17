@@ -219,6 +219,9 @@ class IWAVE(BaseEstimator):
     use_spline_prior : bool, default = False
         Whether to use spline/spline coupling prior distribution for the
         latent factors. [5]_ [6]_
+    spline_init_normal : bool, default = True
+        Whether to initialize spline/spline coupling prior close to a standard normal
+        distribution.
     flow_length : int, default = 2
         Number of spline coupling flow layers.
         
