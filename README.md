@@ -57,6 +57,10 @@ Official documentation is available [here](https://deepirtools.readthedocs.io/en
 
 [`examples/big_5_tutorial.ipynb`](https://github.com/cjurban/deepirtools/blob/master/examples/big_5_tutorial.ipynb) gives a tutorial on using DeepIRTools to fit several kinds of latent factor models using large-scale data.
 
+### Demonstration
+
+[`examples/mnist_demo.ipynb`](https://github.com/cjurban/deepirtools/blob/master/examples/mnist_demo.ipynb) gives a demonstration of how DeepIRTools may be used to fit a flexible and identifiable model for generating realistic handwritten digits.
+
 ### Quick Example
 
 ```python
