@@ -502,7 +502,7 @@ class IWAVE(BaseEstimator):
         loader =  torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask,
                                    covariates = covariates),
-                    batch_size = 32, shuffle = True,
+                    batch_size = 32, shuffle = False,
                     pin_memory = self.device == "cuda",
                   )
         
@@ -570,7 +570,7 @@ class IWAVE(BaseEstimator):
         loader = torch.utils.data.DataLoader(
                     tensor_dataset(data = data, mask = missing_mask,
                                    covariates = covariates),
-                    batch_size = 32, shuffle = True,
+                    batch_size = 32, shuffle = False,
                     pin_memory = self.device == "cuda",
                   )
         
