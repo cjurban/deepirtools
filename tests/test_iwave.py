@@ -4,8 +4,6 @@ from itertools import product
 import pytest
 import torch
 import numpy as np
-import rpy2.robjects as ro
-from rpy2.robjects.vectors import StrVector
 import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import (invert_cov,
@@ -21,48 +19,36 @@ from .sim_utils import (get_params_and_data,
 
 ABS_TOL = 0.1
 
-utils = ro.packages.importr("utils")
-utils.chooseCRANmirror(ind = 1)
-pkgnames = ["mirt"]
-names_to_install = [pkg for pkg in pkgnames if not ro.packages.isinstalled(pkg)]
-if len(names_to_install) > 0:
-    utils.install_packages(StrVector(names_to_install))
-
-deepirtools.manual_seed(123)
 devices = ["cpu"]
 if torch.cuda.is_available():
     devices.append("cuda")
 
-sample_size = 10000
-n_indicators = 5
+sample_size = 8000
+n_indicators = 4
 
 
-def _test_args():
-    def enumerated_product(*args):
-        yield from zip(product(*(range(len(x)) for x in args)), product(*args))
-    
-    prods = enumerated_product(["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"],
-                               ["none", "binary", "linear"],
-                               [1, 5],
-                               ["fixed_variances_no_covariances", "fixed_variances", "free"],
-                               ["fixed_means", "latent_regression", "free"],
-                               [True, False],
-                               devices
-                              )
-    return [["_".join((str(i) for i in idx))] + [p for p in prod] for
-            idx, prod in prods if not ((prod[2] == 1 and prod[3] == "fixed_variances") or
-                                       (prod[0] not in ("grm", "gpcm") and not prod[5]) or
-                                       (prod[1] != "linear" and prod[3] == "free") or
-                                       (prod[1] == "linear" and prod[3] != "free") or
-                                       (prod[1] == "none" and prod[4] != "fixed_means")
-                                      )
+def _recovery_args():
+    prods = product(["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"],
+                    ["none", "binary", "linear"],
+                    [1, 3],
+                    ["fixed_variances_no_covariances", "fixed_variances", "free"],
+                    ["fixed_means", "latent_regression", "free"],
+                    [True, False],
+                    devices
+                   )
+    return [[p for p in prod] for prod in prods if
+            not ((prod[2] == 1 and prod[3] == "fixed_variances") or
+                 (prod[0] not in ("grm", "gpcm") and not prod[5]) or
+                 (prod[1] != "linear" and prod[3] == "free") or
+                 (prod[1] == "linear" and prod[3] != "free") or
+                 (prod[1] == "none" and prod[4] != "fixed_means")
+                )
            ]
 
 
-@pytest.mark.parametrize(("idx, model_type, constraint_type, latent_size, "
-                          "cov_type, mean_type, all_same_n_cats, device"), _test_args())
-def test_param_recovery(idx:             str,
-                        model_type:      str,
+@pytest.mark.parametrize(("model_type, constraint_type, latent_size, "
+                          "cov_type, mean_type, all_same_n_cats, device"), _recovery_args())
+def test_param_recovery(model_type:      str,
                         constraint_type: str,
                         latent_size:     int,
                         cov_type:        str,
@@ -71,9 +57,12 @@ def test_param_recovery(idx:             str,
                         device:          str,
                        ):
     """Test parameter recovery for I-WAVE."""
+    deepirtools.manual_seed(123)
+    
     res = get_params_and_data(model_type, n_indicators, latent_size, cov_type, mean_type,
                               sample_size, all_same_n_cats)
     
+    # Get arguments for IWAVE() and fit().
     n_items = res["Y"].shape[1]
     iwave_kwargs = {"model_type" : res["model_type"], "ints_mask" : res["ints_mask"]}
     if model_type in ("grm", "gpcm", "mixed"):
@@ -92,51 +81,104 @@ def test_param_recovery(idx:             str,
     constraints = get_constraints(latent_size, n_indicators, constraint_type)
 
     model = IWAVE(
-        device = device,
+        learning_rate = (0.01 if constraint_type != "linear" else 0.001), # Marker constraints impact likelihood surface shape,
+        device = device,                                                  # making optimization more challenging.
         latent_size = latent_size,
+        n_intervals = (20 if constraint_type != "linear" else 100), # Convergence happens in fewer iterations with a larger learning rate.
         **{**iwave_kwargs, **constraints},
     )
-    model.fit(res["Y"], covariates = res["covariates"], batch_size = 512, iw_samples = 5)
+    model.fit(res["Y"], covariates = res["covariates"], batch_size = 256, iw_samples = 64) # Large batch_size and iw_samples to reduce
+                                                                                           # both bias and variance.
     
-    exp_ldgs, exp_ints, exp_cov_mat = res["loadings"], res["intercepts"], res["cov_mat"]
-    exp_res_std, exp_probs = res["residual_std"], res["probs"]
-    exp_mean, exp_lreg_weight = res["mean"], res["latent_regression_weight"]
-    
+    # Extract parameters.
+    true_params = [res["loadings"], res["cov_mat"], res["intercepts"],
+                   res["residual_std"], res["probs"],
+                   (res["mean"] if mean_type == "free" else None), 
+                   res["latent_regression_weight"],
+                  ]
+    est_params = []
     if latent_size > 1 and constraint_type == "none":
         if cov_type == "fixed_variances_no_covariances":
             rotator = Rotator(method = "varimax")
         elif cov_type == "fixed_variances":
             rotator = Rotator(method = "geomin_obl")
-        est_ldgs = torch.from_numpy(rotator.fit_transform(model.loadings.numpy()))
-        est_cov_mat = (torch.from_numpy(rotator.phi_) if rotator.phi_ is not None else None)
+        est_params.extend((torch.from_numpy(rotator.fit_transform(model.loadings.numpy())),
+                           (torch.from_numpy(rotator.phi_) if
+                            rotator.phi_ is not None else None)))
     else:
-        est_ldgs, est_cov_mat = model.loadings, model.cov
-    est_ints = model.intercepts
-    if "gpcm" in res["model_types"] and len(exp_ints.shape) == 2:
-        if exp_ints.shape[1] > 1:
-            gpcm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "gpcm"]).long()
-            est_ints[gpcm_idxs] = est_ints[gpcm_idxs].cumsum(dim = 1)
-    est_res_std, est_probs = model.residual_std, model.probs
-    est_mean, est_lreg_weight = model.mean, model.latent_regression_weight
+        est_params.extend((model.loadings,
+                           (None if ((latent_size == 1 and "free" not in cov_type) or
+                                     (latent_size > 1 and "no_covariances" in cov_type))
+                            else model.cov)))
+    est_params.extend((model.intercepts, model.residual_std, model.probs,
+                       (model.mean if mean_type == "free" else None),
+                       model.latent_regression_weight))
     
-    ldgs_err = match_columns(est_ldgs, exp_ldgs).add(-exp_ldgs).pow(2)
-    ints_err = est_ints.add(-exp_ints)[~exp_ints.isnan()].pow(2)
-    assert(ldgs_err[ldgs_err != 0].mean().le(ABS_TOL)), print(ldgs_err)
-    assert(ints_err[ints_err != 0].mean().le(ABS_TOL)), print(ints_err)
-    if est_cov_mat is not None:
-        if ((latent_size > 1 and cov_type != "fixed_variances_no_covariances") or
-            (latent_size == 1 and cov_type == "free")):
-            cov_err = invert_cov(est_cov_mat, est_ldgs).add(-exp_cov_mat).tril().pow(2)
-            assert(cov_err[cov_err != 0].mean().le(ABS_TOL)), print(cov_err)
-    if est_res_std is not None:
-        res_std_err = est_res_std.add(-exp_res_std).pow(2)
-        assert(res_std_err[~res_std_err.isnan()].mean().le(ABS_TOL)), print(res_std_err)
-    if est_probs is not None:
-        probs_err = est_probs.add(-exp_probs).pow(2)
-        assert(probs_err[~probs_err.isnan()].mean().le(ABS_TOL)), print(probs_err)
-    if mean_type == "latent_regression":
-        lreg_weight_err = invert_latent_regression_weight(est_lreg_weight, est_ldgs).add(-exp_lreg_weight).pow(2)
-        assert(lreg_weight_err.mean().le(ABS_TOL)), print(lreg_weight_err)
-    elif mean_type == "free":
-        mean_err = invert_mean(est_mean, est_ldgs).add(-exp_mean).pow(2)
-        assert(mean_err.mean().le(ABS_TOL)), print(mean_err)
+    # Prepare parameters for comparison.
+    if latent_size > 1 and est_params[1] is not None:
+        est_params[1] = invert_cov(est_params[1], est_params[0])
+    if mean_type == "free":
+        est_params[2], true_params[2] = (est_params[2][true_params[2].eq(0).logical_not()],
+                                         true_params[2][true_params[2].eq(0).logical_not()])
+    if est_params[-2] is not None:
+        est_params[-2] = invert_mean(est_params[-2], est_params[0])
+    if est_params[-1] is not None:
+        est_params[-1] = invert_latent_regression_weight(est_params[-1], est_params[0])
+    est_params[0], match_idxs = match_columns(est_params[0], true_params[0])
+    est_params[0], true_params[0] = (est_params[0][est_params[0].eq(0).logical_not()],
+                                     true_params[0][est_params[0].eq(0).logical_not()])
+    if constraint_type != "none":
+        est_params[0], true_params[0] = (est_params[0][true_params[0].eq(1).logical_or(true_params[0].eq(0)).logical_not()],
+                                         true_params[0][true_params[0].eq(1).logical_or(true_params[0].eq(0)).logical_not()])
+    if est_params[1] is not None:
+        est_params[1] = est_params[1][match_idxs][:, match_idxs].tril(
+            diagonal = (0 if cov_type == "free" else -1)
+        )
+        est_params[1], true_params[1] = (est_params[1][est_params[1].eq(0).logical_not()],
+                                         true_params[1][est_params[1].eq(0).logical_not()])
+    
+    errs = []
+    for i, params in enumerate(zip(est_params, true_params)):
+        est, true = params[0], params[1]
+        if true is not None and est is not None:
+            errs.append(est.add(-true)[true.isnan().logical_not()])
+    assert(torch.cat(errs, dim = 0).abs().mean().lt(ABS_TOL))
+        
+
+@pytest.mark.parametrize("model_type", ["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"])
+@pytest.mark.parametrize("latent_size", [1, 3])
+@pytest.mark.parametrize("device", devices)
+def test_scores_recovery(model_type:      str,
+                         latent_size:     int,
+                         device:          str,
+                        ):
+    """Test factor scores recovery for I-WAVE."""
+    deepirtools.manual_seed(123)
+    
+    res = get_params_and_data(model_type, n_indicators, latent_size, "fixed_variances",
+                              "fixed_means", sample_size)
+    
+    # Get arguments for IWAVE() and fit().
+    n_items = res["Y"].shape[1]
+    iwave_kwargs = {"model_type" : res["model_type"], "ints_mask" : res["ints_mask"]}
+    if model_type in ("grm", "gpcm", "mixed"):
+        iwave_kwargs["n_cats"] = res["n_cats"]
+    else:
+        iwave_kwargs["n_items"] = n_items
+    if latent_size > 1:
+        iwave_kwargs["correlated_factors"] = [i for i in range(latent_size)]
+    constraints = get_constraints(latent_size, n_indicators, "binary")
+
+    model = IWAVE(
+        learning_rate = 0.01,
+        device = device,
+        latent_size = latent_size,
+        n_intervals = 20,
+        **{**iwave_kwargs, **constraints},
+    )
+    model.fit(res["Y"], batch_size = 256, iw_samples = 64)
+    
+    est_scores = model.scores(res["Y"], mc_samples = 100, iw_samples = 100)
+    for i in range(latent_size):
+        combined_scores = torch.stack((est_scores[:, i], res["scores"][:, i]), dim = 0)
+        assert(torch.corrcoef(combined_scores)[1, 0].gt(0.5))

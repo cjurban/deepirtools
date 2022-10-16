@@ -19,7 +19,9 @@ def screeplot(latent_sizes:             List[int],
               gradient_estimator:       str = "dreg",
               device:                   str = "cpu",
               log_interval:             int = 100,
+              mc_samples_fit:           int = 1,
               iw_samples_fit:           int = 1,
+              mc_samples_ll:            int = 1,
               iw_samples_ll:            int = 5000,
               random_seed:              int = 1,
               xlab:                     str = "Number of Factors",
@@ -100,8 +102,12 @@ def screeplot(latent_sizes:             List[int],
         Computing device used for fitting.
     log_interval : str, default = 100
         Frequency of updates printed during fitting.
+    mc_samples_fit : int, default = 1
+        Number of Monte Carlo samples for fitting.
     iw_samples_fit : int, default = 1
         Number of importance-weighted samples for fitting.
+    mc_samples_ll : int, default = 1
+        Number of Monte Carlo samples for calculating approximate log-likelihoods.
     iw_samples_ll : int, default = 5000
         Number of importance-weighted samples for calculating approximate log-likelihoods.
     random_seed : int, default = 1
@@ -134,6 +140,7 @@ def screeplot(latent_sizes:             List[int],
         ...     data = data,
         ...     model_type = "grm",
         ...     test_size = 0.1,
+        ...     iw_samples_fit = 10,
         ...     n_cats = [3] * n_items,
         ... )
         Latent size =  2
@@ -142,11 +149,11 @@ def screeplot(latent_sizes:             List[int],
         Initialization ended in  0.0  seconds
 
         Fitting started
-        Epoch =     962 Iter. =  27901 Cur. loss =   11.08   Intervals no change = 100
-        Fitting ended in  47.45  seconds
+        Epoch =       79 Iter. =    17801 Cur. loss =   11.78   Intervals no change =  100
+        Fitting ended in  43.68  seconds
 
         Computing approx. LL
-        Approx. LL computed in 0.3 seconds
+        Approx. LL computed in 2.02 seconds
 
         Latent size =  3
 
@@ -154,11 +161,11 @@ def screeplot(latent_sizes:             List[int],
         Initialization ended in  0.0  seconds
 
         Fitting started
-        Epoch =    1155 Iter. =  33501 Cur. loss =   11.20   Intervals no change = 100
-        Fitting ended in  56.25  seconds
+        Epoch =      150 Iter. =    33901 Cur. loss =   10.66   Intervals no change =  100
+        Fitting ended in  73.85  seconds
 
         Computing approx. LL
-        Approx. LL computed in 0.32 seconds
+        Approx. LL computed in 2.48 seconds
 
         Latent size =  4
 
@@ -166,11 +173,11 @@ def screeplot(latent_sizes:             List[int],
         Initialization ended in  0.0  seconds
 
         Fitting started
-        Epoch =    1565 Iter. =  45401 Cur. loss =   11.25   Intervals no change = 100
-        Fitting ended in  77.18  seconds
+        Epoch =       97 Iter. =    22001 Cur. loss =   10.69   Intervals no change =  100
+        Fitting ended in  48.14  seconds
 
         Computing approx. LL
-        Approx. LL computed in 0.45 seconds
+        Approx. LL computed in 2.54 seconds
 
         Latent size =  5
 
@@ -178,11 +185,11 @@ def screeplot(latent_sizes:             List[int],
         Initialization ended in  0.0  seconds
 
         Fitting started
-        Epoch =    1455 Iter. =  42201 Cur. loss =   11.42   Intervals no change = 100
-        Fitting ended in  69.31  seconds
+        Epoch =       65 Iter. =    14801 Cur. loss =   10.23   Intervals no change =  100
+        Fitting ended in  32.25  seconds
 
         Computing approx. LL
-        Approx. LL computed in 0.36 seconds
+        Approx. LL computed in 2.53 seconds
 
         Latent size =  6
 
@@ -190,17 +197,17 @@ def screeplot(latent_sizes:             List[int],
         Initialization ended in  0.0  seconds
 
         Fitting started
-        Epoch =    1065 Iter. =  30901 Cur. loss =   11.26   Intervals no change = 100
-        Fitting ended in  50.4  seconds
+        Epoch =       87 Iter. =    19701 Cur. loss =   10.85   Intervals no change =  100
+        Fitting ended in  47.94  seconds
 
         Computing approx. LL
-        Approx. LL computed in 0.36 seconds
+        Approx. LL computed in 2.37 seconds
         
-        [-1140.893642425537,
-         -1139.5399551391602,
-         -1137.2033195495605,
-         -1137.3607940673828,
-         -1136.9872550964355]
+        [-8664.070281982422,
+         -8636.188293457031,
+         -8625.401916503906,
+         -8625.752655029297,
+         -8625.614959716797]
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."
@@ -237,9 +244,10 @@ def screeplot(latent_sizes:             List[int],
                       **model_kwargs,
                      )
         model.fit(data_train, batch_size = batch_size, missing_mask = mask_train,
-                  max_epochs = max_epochs, iw_samples = iw_samples_fit)
+                  max_epochs = max_epochs, mc_samples = mc_samples_fit, iw_samples = iw_samples_fit)
 
-        ll = model.log_likelihood(data_test, missing_mask = mask_test, iw_samples = iw_samples_ll)
+        ll = model.log_likelihood(data_test, missing_mask = mask_test,
+                                  mc_samples = mc_samples_ll, iw_samples = iw_samples_ll)
         ll_list.append(ll)
         
     fig, ax = plt.subplots(constrained_layout = True)
