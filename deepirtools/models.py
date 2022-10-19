@@ -101,12 +101,14 @@ class CategoricalBias(nn.Module):
             ints_mask = torch.ones([n_items])
             
         bias_list = []
+        ints_mask_list = []
         for i, n_cat in enumerate(n_cats):
-            thresholds = get_thresholds([ints_mask[i].item() * -4, 4], n_cat)
+            thresholds = get_thresholds([ints_mask[i].item() * -4, 4], n_cat).flip(-1)
             bias_list.append(F.pad(thresholds, (0, M - n_cat),
-                                   value = float("inf"))) # Inf. saturates exponentials.
+                                   value = -float("inf"))) # Infs. saturate sigmoids.
+            ints_mask_list.append(F.pad(ints_mask[i:i + 1], (n_cat - 2, M - n_cat), value = 1.))
         self._bias = nn.Parameter(torch.stack(bias_list, dim = 0))
-        self.register_buffer("ints_mask", torch.cat([ints_mask.unsqueeze(1), torch.ones([n_items, M - 2])], dim = 1))
+        self.register_buffer("ints_mask", torch.stack(ints_mask_list, dim = 0))
         
         nan_mask = torch.where(self._bias.isinf(), torch.ones_like(self._bias) * float("nan"),
                                torch.ones_like(self._bias))
@@ -232,10 +234,10 @@ class GradedResponseModel(GradedBaseModel):
             Bx = self._loadings(x)
         else:
             Bx = F.linear(x, loadings)
-        cum_probs = self._intercepts(Bx.unsqueeze(-1).expand(Bx.shape +
-                                                             torch.Size([max(self.n_cats) - 1]))).sigmoid()
-        upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
-        lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
+        shape = Bx.shape + torch.Size([max(self.n_cats) - 1])
+        cum_probs = self._intercepts(Bx.unsqueeze(-1).expand(shape)).sigmoid()
+        upper_probs = F.pad(cum_probs, (1, 0), value = 1.)
+        lower_probs = F.pad(cum_probs, (0, 1), value = 0.)
         return upper_probs - lower_probs
 
     def forward(self,
@@ -283,7 +285,7 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         
         cum_bias = self._intercepts._bias.mul(self._intercepts.ints_mask).cumsum(dim = 1)
         cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
-        tmp = kBx - cum_bias
+        tmp = kBx + cum_bias
         log_py_x = tmp - (tmp).logsumexp(dim = -1, keepdim = True)
         
         if log_mean:
@@ -299,6 +301,48 @@ class GeneralizedPartialCreditModel(GradedBaseModel):
         log_py_x = self.conditional_mean(x = x, loadings = loadings, log_mean = True)
         idxs = y.long().expand(log_py_x[..., -1].shape).unsqueeze(-1)
         log_py_x = -torch.gather(log_py_x, dim = -1, index = idxs).squeeze(-1)
+        if mask is not None:
+            log_py_x = log_py_x.mul(mask)
+        return log_py_x.sum(dim = -1, keepdim = True)
+    
+    
+class NominalResponseModel(GradedBaseModel):
+    """Nominal response model."""
+    
+    def __init__(self,
+                 latent_size:  int,
+                 n_cats:       List[int],
+                 Q:            Optional[torch.Tensor] = None,
+                 A:            Optional[torch.Tensor] = None,
+                 b:            Optional[torch.Tensor] = None,
+                 ints_mask:    Optional[torch.Tensor] = None,
+                 _no_loadings: bool = False,
+                ):
+        super().__init__(latent_size = latent_size, n_cats = n_cats, Q = Q, A = A, b = b,
+                         ints_mask = ints_mask, _no_loadings = _no_loadings)
+        
+    def conditional_mean(self,
+                         x:        torch.Tensor,
+                         loadings: Optional[torch.Tensor] = None,
+                        ):
+        if loadings is None:
+            Bx = self._loadings(x)
+        else:
+            Bx = F.linear(x, loadings)
+        shape = Bx.shape + torch.Size([max(self.n_cats) - 1])
+        bias = self._intercepts._bias.mul(self._intercepts.ints_mask)
+        tmp = bias.unsqueeze(0).expand(shape) + Bx.unsqueeze(-1).expand(shape)
+        return (F.pad(tmp, (1, 0), value = 0.)).softmax(dim = -1)
+
+    def forward(self,
+                x:        torch.Tensor,
+                y:        torch.Tensor,
+                mask:     Optional[torch.Tensor] = None,
+                loadings: Optional[torch.Tensor] = None,
+               ):
+        probs = self.conditional_mean(x = x, loadings = loadings)
+        idxs = y.long().expand(probs[..., -1].shape).unsqueeze(-1)
+        log_py_x = -(torch.gather(probs, dim = -1, index = idxs).squeeze(-1)).clamp(min = EPS).log()
         if mask is not None:
             log_py_x = log_py_x.mul(mask)
         return log_py_x.sum(dim = -1, keepdim = True)
@@ -566,6 +610,7 @@ class ModelTypes():
     
     MODEL_TYPES = {"grm" : GradedResponseModel,
                    "gpcm" : GeneralizedPartialCreditModel,
+                   "nominal" : NominalResponseModel,
                    "poisson" : PoissonFactorModel,
                    "negative_binomial" : NegativeBinomialFactorModel,
                    "normal" : NormalFactorModel,
@@ -632,7 +677,7 @@ class MixedFactorModel(nn.Module):
                 _ints_mask = ints_mask[self.sorted_idxs][idx1:idx2]
             else:
                 _ints_mask = None
-            if unique_model_types[model_idx] in ("grm", "gpcm"):
+            if unique_model_types[model_idx] in ("grm", "gpcm", "nominal"):
                 model_kwargs = {"n_cats" : [n_cats[i] for i in sorted_idxs][idx1:idx2]}
             else:
                 model_kwargs = {"n_items" : (idx2 - idx1).item()}

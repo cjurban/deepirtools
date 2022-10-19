@@ -53,6 +53,8 @@ def screeplot(latent_sizes:             List[int],
         * \"grm\", graded response model;
 
         * \"gpcm\", generalized partial credit model;
+        
+        * \"nominal\", nominal response model;
 
         * \"poisson\", poisson factor model;
 

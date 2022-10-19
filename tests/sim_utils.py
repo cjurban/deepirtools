@@ -1,53 +1,18 @@
 import random
 import torch
 import torch.nn.functional as F
-from torch.distributions import Distribution, Categorical
 import pyro.distributions as pydist
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+import rpy2.robjects as ro
+from rpy2.robjects import numpy2ri, packages
 from typing import List, Optional
 import itertools
 from operator import itemgetter
-from deepirtools.utils import invert_factors
+from deepirtools.utils import invert_factors, multi_categorical_maker
 
 
-class MultiCategorical(Distribution):
-    """Simulate from multiple categorical distributions.
-    
-    Modified from:
-    https://github.com/pytorch/pytorch/issues/43250"""
-
-    def __init__(self, dists: List[Categorical]):
-        super().__init__(validate_args = False)
-        self.dists = dists
-
-    def log_prob(self, value):
-        ans = []
-        for d, v in zip(self.dists, torch.split(value, 1, dim=-1)):
-            ans.append(d.log_prob(v.squeeze(-1)))
-        return torch.stack(ans, dim=-1)
-
-    def entropy(self):
-        return torch.stack([d.entropy() for d in self.dists], dim=-1).sum(dim=-1)
-
-    def sample(self, sample_shape=torch.Size()):
-        return torch.stack([d.sample(sample_shape) for d in self.dists], dim=-1)
-
-
-def multi_categorical_maker(nvec):
-    """Construct a MultiCategorical() distribution.
-    
-    Modified from:
-    https://github.com/pytorch/pytorch/issues/43250"""
-    
-    def get_multi_categorical(probs):
-        start = 0
-        ans = []
-        for n in nvec:
-            ans.append(Categorical(probs=probs[..., start: start + n]))
-            start += n
-        return MultiCategorical(ans)
-    return get_multi_categorical
+numpy2ri.activate()
 
 
 class BaseFactorModelSimulator():
@@ -90,35 +55,43 @@ class GradedResponseModelSimulator(BaseFactorModelSimulator):
         
         self.loadings = loadings
         self.intercepts = intercepts
-        self.n_cats = intercepts.isnan().logical_not().sum(dim=1).add(1).tolist()
         
     @torch.no_grad()    
     def sample(self,
-               sample_size:   Optional[int] = None,
-               x:             Optional[torch.Tensor] = None,
-               return_scores: bool = False,
+               sample_size: Optional[int] = None,
+               x:           Optional[torch.Tensor] = None,
               ):
         assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
         
-        M = max(self.n_cats)
-        
+        ro.r("rm(list = ls())")
+        packages.importr("mirt")
+
+        ldgs_R = ro.r.matrix(self.loadings.numpy(), nrow = self.loadings.shape[0],
+                             ncol = self.loadings.shape[1])
+        ints_R = ro.r.matrix(self.intercepts.numpy(), nrow = self.intercepts.shape[0],
+                             ncol = self.intercepts.shape[1])
         if x is None:
             x = self._scores(sample_size)
-        
-        Bx = F.linear(x, self.loadings)
-        ints = torch.where(self.intercepts.isnan(), torch.ones_like(self.intercepts) * float("inf"),
-                           self.intercepts)
-        cum_probs = (ints + Bx.unsqueeze(-1).expand(Bx.shape + torch.Size([M - 1]))).sigmoid()
-        upper_probs = F.pad(cum_probs, (0, 1), value = 1.)
-        lower_probs = F.pad(cum_probs, (1, 0), value = 0.)
-        probs = upper_probs - lower_probs
-        probs = torch.cat([probs[..., item, :self.n_cats[item]] for
-                           item in range(probs.shape[-2])], dim = -1)
-        Y = multi_categorical_maker(self.n_cats)(probs = probs).sample().float()
-        
-        if return_scores:
-            return Y, x
-        return Y
+        Theta_R = ro.r.matrix(x.numpy(), nrow = x.shape[0], ncol = x.shape[1])
+        ro.r.assign("ldgs", ldgs_R); ro.r.assign("ints", ints_R); ro.r.assign("Theta", Theta_R)
+
+        ro.r("""
+                if (dim(ints)[2] > 1) {
+                  itemtype = ifelse(is.na(ints[, 2]), "2PL", "graded")
+                } else if (dim(ints)[2] == 1) {
+                  itemtype = rep("2PL", dim(ints)[1])
+                }
+                ldgs = matrix(as.vector(t(ldgs)), nrow = dim(ldgs)[1], byrow = TRUE)
+                ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
+                Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+                Y = simdata(a = ldgs,
+                            d = ints,
+                            itemtype = itemtype,
+                            Theta = Theta
+                           )
+             """)
+
+        return torch.from_numpy(ro.r["Y"])
 
 
 class GeneralizedPartialCreditModelSimulator(BaseFactorModelSimulator):
@@ -134,38 +107,88 @@ class GeneralizedPartialCreditModelSimulator(BaseFactorModelSimulator):
         
         self.loadings = loadings
         self.intercepts = intercepts
-        self.n_cats = intercepts.isnan().logical_not().sum(dim=1).add(1).tolist()
         
     @torch.no_grad()    
     def sample(self,
-               sample_size:   Optional[int] = None,
-               x:             Optional[torch.Tensor] = None,
-               return_scores: bool = False,
+               sample_size: Optional[int] = None,
+               x:           Optional[torch.Tensor] = None,
               ):
         assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
         
-        M = max(self.n_cats)
+        ro.r("rm(list = ls())")
+        packages.importr("mirt")
 
+        ldgs_R = ro.r.matrix(self.loadings.numpy(), nrow = self.loadings.shape[0],
+                             ncol = self.loadings.shape[1])
+        ints_R = ro.r.matrix(self.intercepts.numpy(), nrow = self.intercepts.shape[0],
+                             ncol = self.intercepts.shape[1])
         if x is None:
             x = self._scores(sample_size)
-        
-        Bx = F.linear(x, self.loadings)
-        shape = Bx.shape + torch.Size([M])
-        kBx = Bx.unsqueeze(-1).expand(shape) * torch.linspace(0, M - 1, M, device = x.device)
-        
-        cum_bias = torch.where(self.intercepts.isnan(), torch.ones_like(self.intercepts) * float("inf"),
-                               self.intercepts).cumsum(dim = 1)
-        cum_bias = F.pad(cum_bias, (1, 0), value = 0.).expand(shape)
-        tmp = kBx - cum_bias
-        probs = (tmp - (tmp).logsumexp(dim = -1, keepdim = True)).exp()
-        probs = torch.cat([probs[..., item, :self.n_cats[item]] for
-                           item in range(probs.shape[-2])], dim = -1)
-        Y = multi_categorical_maker(self.n_cats)(probs = probs).sample().float()
-        
-        if return_scores:
-            return Y, x
-        return Y
+        Theta_R = ro.r.matrix(x.numpy(), nrow = x.shape[0], ncol = x.shape[1])
+        ro.r.assign("ldgs", ldgs_R); ro.r.assign("ints", ints_R); ro.r.assign("Theta", Theta_R)
 
+        ro.r("""
+                ldgs = matrix(as.vector(t(ldgs)), nrow = dim(ldgs)[1], byrow = TRUE)
+                ints = cbind(rep(0, dim(ints)[1]), ints)
+                ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
+                Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+                Y = simdata(a = ldgs,
+                            d = ints,
+                            itemtype = rep("gpcm", dim(ints)[1]),
+                            Theta = Theta
+                           )
+             """)
+    
+        return torch.from_numpy(ro.r["Y"])
+    
+    
+class NominalResponseModelSimulator(BaseFactorModelSimulator):
+    
+    def __init__(self,
+                 loadings:   torch.Tensor,
+                 intercepts: torch.Tensor,
+                 cov_mat:    torch.Tensor,
+                 mean:       torch.Tensor,
+                ):
+        """ Simulate from the nominal response model."""
+        super().__init__(cov_mat = cov_mat, mean = mean)
+        
+        self.loadings = loadings
+        self.intercepts = intercepts
+        
+    @torch.no_grad()    
+    def sample(self,
+               sample_size: Optional[int] = None,
+               x:           Optional[torch.Tensor] = None,
+              ):
+        assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
+        
+        ro.r("rm(list = ls())")
+        packages.importr("mirt")
+
+        ldgs_R = ro.r.matrix(self.loadings.numpy(), nrow = self.loadings.shape[0],
+                             ncol = self.loadings.shape[1])
+        ints_R = ro.r.matrix(self.intercepts.numpy(), nrow = self.intercepts.shape[0],
+                             ncol = self.intercepts.shape[1])
+        if x is None:
+            x = self._scores(sample_size)
+        Theta_R = ro.r.matrix(x.numpy(), nrow = x.shape[0], ncol = x.shape[1])
+        ro.r.assign("ldgs", ldgs_R); ro.r.assign("ints", ints_R); ro.r.assign("Theta", Theta_R)
+
+        ro.r("""
+                ldgs = matrix(as.vector(t(ldgs)), nrow = dim(ldgs)[1], byrow = TRUE)
+                ints = cbind(rep(0, dim(ints)[1]), ints)
+                ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
+                Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+                Y = simdata(a = ldgs,
+                            d = ints,
+                            itemtype = rep("nominal", dim(ints)[1]),
+                            Theta = Theta
+                           )
+             """)
+    
+        return torch.from_numpy(ro.r["Y"])
+    
         
 class PoissonFactorModelSimulator(BaseFactorModelSimulator):
     
@@ -313,6 +336,7 @@ class Simulators():
     
     SIMULATORS = {"grm" : GradedResponseModelSimulator,
                   "gpcm" : GeneralizedPartialCreditModelSimulator,
+                  "nominal" : NominalResponseModelSimulator,
                   "poisson" : PoissonFactorModelSimulator,
                   "negative_binomial" : NegativeBinomialFactorModelSimulator,
                   "normal" : NormalFactorModelSimulator,
@@ -405,7 +429,7 @@ class MixedFactorModelSimulator(BaseFactorModelSimulator):
     
     @property
     def n_cats(self):
-        return [sum(~i.isnan()).item() + 1 if m in ("grm", "gpcm") else None for
+        return [sum(~i.isnan()).item() + 1 if m in ("grm", "gpcm", "nominal") else None for
                 i, m in zip(self.intercepts, self.model_types)]
         
     
@@ -424,7 +448,7 @@ def get_loadings(n_indicators:         int,
     return ldgs
 
 
-def get_categorical_intercepts(n_items:         int,
+def get_categorical_intercepts(n_items:         int, # TODO: Handle ints_mask.
                                all_same_n_cats: bool = True, 
                               ):
     """Simulate intercepts for a categorical response model."""
@@ -444,7 +468,7 @@ def get_categorical_intercepts(n_items:         int,
                    0.5 * (cuts[1:] + cuts[:-1]))
         else:
             tmp = pydist.Uniform(-1.5, 1.5).sample([1, 1])
-        ints.append(F.pad(tmp, (0, max(n_cats) - n_cat), value = float("nan")))
+        ints.append(F.pad(tmp.flip(-1), (0, max(n_cats) - n_cat), value = float("nan")))
 
     return torch.cat(ints, dim = 0)
 
@@ -564,7 +588,7 @@ def get_params_and_data(model_type:      str,
         _ints_mask = ints_mask[_item_idxs]
         
         sim_kwargs = {"loadings" : ldgs[_item_idxs], "cov_mat" : cov_mat, "mean" : mean}
-        if u in ("grm", "gpcm"):
+        if u in ("grm", "gpcm", "nominal"):
             sim_kwargs["intercepts"] = get_categorical_intercepts(_n_items, all_same_n_cats)
         else:
             if u != "normal":

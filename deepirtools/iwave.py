@@ -45,17 +45,27 @@ class IWAVE(BaseEstimator):
               \end{split}
             
           where :math:`\alpha_{j, k}` is the :math:`k^\text{th}` category intercept for item
-          :math:`j`, :math:`K_j` is the number of responses categories for item :math:`j`,
+          :math:`j`, :math:`K_j` is the number of response categories for item :math:`j`,
           and :math:`\sigma(z) = 1 / (1 + \exp[-z])` is the inverse logistic link function.
         
         * \"gpcm\", generalized partial credit model:
         
           .. math::
               \text{Pr}(y_j = k - 1 \mid \boldsymbol{x}) = \frac{\exp\big[(k - 1)\boldsymbol{\beta}_j^\top
-              \boldsymbol{x} - \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)
-              \boldsymbol{\beta}_j^\top\boldsymbol{x} - \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
+              \boldsymbol{x} + \sum_{\ell = 1}^k \alpha_{j, \ell} \big]}{\sum_{m = 1}^{K_j} \exp \big[ (m - 1)
+              \boldsymbol{\beta}_j^\top\boldsymbol{x} + \sum_{\ell = 1}^m \alpha_{j, \ell} \big]},
             
           where :math:`k = 1, \ldots, K_j` and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
+          category intercept for item :math:`j`.
+          
+        * \"nominal\", nominal response model:
+        
+          .. math::
+              \text{Pr}(y_j = k \mid \boldsymbol{x}) = \frac{\exp[\mathbbm{1}(k \neq 0) (\alpha_{j, k} + \boldsymbol{\beta}_j^\top
+              \boldsymbol{x}) ]}{1 + \sum_{\ell = 1}^{K_j} \exp [ \alpha_{j, \ell} + \boldsymbol{\beta}_j^\top
+              \boldsymbol{x} ]},
+            
+          where :math:`k = 0, \ldots, K_j - 1` and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
           category intercept for item :math:`j`.
         
         * \"poisson\", poisson factor model:

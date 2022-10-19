@@ -4,6 +4,8 @@ from itertools import product
 import pytest
 import torch
 import numpy as np
+import rpy2.robjects as ro
+from rpy2.robjects.vectors import StrVector
 import deepirtools
 from deepirtools import IWAVE
 from deepirtools.utils import (invert_cov,
@@ -19,6 +21,13 @@ from .sim_utils import (get_params_and_data,
 
 ABS_TOL = 0.1
 
+utils = ro.packages.importr("utils")
+utils.chooseCRANmirror(ind = 1)
+pkgnames = ["mirt"]
+names_to_install = [pkg for pkg in pkgnames if not ro.packages.isinstalled(pkg)]
+if len(names_to_install) > 0:
+    utils.install_packages(StrVector(names_to_install))
+
 devices = ["cpu"]
 if torch.cuda.is_available():
     devices.append("cuda")
@@ -28,7 +37,8 @@ n_indicators = 4
 
 
 def _recovery_args():
-    prods = product(["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"],
+    prods = product(["mixed", "gpcm", "grm", "nominal",
+                     "negative_binomial", "poisson", "normal", "lognormal"],
                     ["none", "binary", "linear"],
                     [1, 3],
                     ["fixed_variances_no_covariances", "fixed_variances", "free"],
@@ -145,7 +155,8 @@ def test_param_recovery(model_type:      str,
     assert(torch.cat(errs, dim = 0).abs().mean().lt(ABS_TOL))
         
 
-@pytest.mark.parametrize("model_type", ["mixed", "gpcm", "grm", "negative_binomial", "poisson", "normal", "lognormal"])
+@pytest.mark.parametrize("model_type", ["mixed", "gpcm", "grm", "nominal",
+                                        "negative_binomial", "poisson", "normal", "lognormal"])
 @pytest.mark.parametrize("latent_size", [1, 3])
 @pytest.mark.parametrize("device", devices)
 def test_scores_recovery(model_type:      str,
