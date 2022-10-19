@@ -180,10 +180,13 @@ class NominalResponseModelSimulator(BaseFactorModelSimulator):
                 ints = cbind(rep(0, dim(ints)[1]), ints)
                 ints = matrix(as.vector(t(ints)), nrow = dim(ints)[1], byrow = TRUE)
                 Theta = matrix(as.vector(t(Theta)), nrow = dim(Theta)[1], byrow = TRUE)
+                nominal = ifelse(is.na(ints), NA, 1)
+                nominal[, 1] = 0
                 Y = simdata(a = ldgs,
                             d = ints,
                             itemtype = rep("nominal", dim(ints)[1]),
-                            Theta = Theta
+                            Theta = Theta,
+                            nominal = nominal,
                            )
              """)
     
