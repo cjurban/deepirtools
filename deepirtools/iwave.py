@@ -61,11 +61,11 @@ class IWAVE(BaseEstimator):
         * \"nominal\", nominal response model:
         
           .. math::
-              \text{Pr}(y_j = k \mid \boldsymbol{x}) = \frac{\exp[\mathbbm{1}(k \neq 0) (\alpha_{j, k} + \boldsymbol{\beta}_j^\top
+              \text{Pr}(y_j = k \mid \boldsymbol{x}) = \frac{\exp[\mathbb{1}(k \neq 0) (\alpha_{j, k} + \boldsymbol{\beta}_j^\top
               \boldsymbol{x}) ]}{1 + \sum_{\ell = 1}^{K_j} \exp [ \alpha_{j, \ell} + \boldsymbol{\beta}_j^\top
               \boldsymbol{x} ]},
             
-          where :math:`k = 0, \ldots, K_j - 1` and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
+          where :math:`k = 0, \ldots, K_j - 1`, :math:`\mathbb{1}(\cdot)` is the indicator function, and :math:`\alpha_{j, k}` is the :math:`k^\text{th}`
           category intercept for item :math:`j`.
         
         * \"poisson\", poisson factor model:

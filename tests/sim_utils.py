@@ -451,7 +451,7 @@ def get_loadings(n_indicators:         int,
     return ldgs
 
 
-def get_categorical_intercepts(n_items:         int, # TODO: Handle ints_mask.
+def get_categorical_intercepts(n_items:         int,
                                all_same_n_cats: bool = True, 
                               ):
     """Simulate intercepts for a categorical response model."""
@@ -607,6 +607,7 @@ def get_params_and_data(model_type:      str,
                 sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([_n_items])
                 
         if len(sim_kwargs["intercepts"].shape) > 1:
+#            F.pad(_ints_mask.unsqueeze(1), (n_cat - 2, M - n_cat), value = 1.)
             sim_kwargs["intercepts"].mul_(torch.cat((_ints_mask.unsqueeze(1),
                                                      torch.ones([_n_items, 
                                                                  sim_kwargs["intercepts"].shape[1] - 1])), dim = 1))

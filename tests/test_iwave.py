@@ -51,7 +51,8 @@ def _recovery_args():
                  (prod[0] not in ("grm", "gpcm") and not prod[5]) or
                  (prod[1] != "linear" and prod[3] == "free") or
                  (prod[1] == "linear" and prod[3] != "free") or
-                 (prod[1] == "none" and prod[4] != "fixed_means")
+                 (prod[1] == "none" and prod[4] != "fixed_means") or
+                 (prod[0] == "mixed" and prod[7] == False)
                 )
            ]
 
