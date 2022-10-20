@@ -24,6 +24,7 @@ The following (multidimensional) latent factor models are currently available...
 
   - Graded response model
   - Generalized partial credit model
+  - Nominal response model
 
 - ...for continuous items:
 

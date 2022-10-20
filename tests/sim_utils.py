@@ -58,8 +58,9 @@ class GradedResponseModelSimulator(BaseFactorModelSimulator):
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: Optional[int] = None,
-               x:           Optional[torch.Tensor] = None,
+               sample_size:   Optional[int] = None,
+               x:             Optional[torch.Tensor] = None,
+               return_scores: bool = False,
               ):
         assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
         
@@ -91,6 +92,8 @@ class GradedResponseModelSimulator(BaseFactorModelSimulator):
                            )
              """)
 
+        if return_scores:
+            return torch.from_numpy(ro.r["Y"]), torch.from_numpy(ro.r["Theta"])
         return torch.from_numpy(ro.r["Y"])
 
 
@@ -110,8 +113,9 @@ class GeneralizedPartialCreditModelSimulator(BaseFactorModelSimulator):
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: Optional[int] = None,
-               x:           Optional[torch.Tensor] = None,
+               sample_size:   Optional[int] = None,
+               x:             Optional[torch.Tensor] = None,
+               return_scores: bool = False,
               ):
         assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
         
@@ -139,6 +143,8 @@ class GeneralizedPartialCreditModelSimulator(BaseFactorModelSimulator):
                            )
              """)
     
+        if return_scores:
+            return torch.from_numpy(ro.r["Y"]), torch.from_numpy(ro.r["Theta"])
         return torch.from_numpy(ro.r["Y"])
     
     
@@ -158,8 +164,9 @@ class NominalResponseModelSimulator(BaseFactorModelSimulator):
         
     @torch.no_grad()    
     def sample(self,
-               sample_size: Optional[int] = None,
-               x:           Optional[torch.Tensor] = None,
+               sample_size:   Optional[int] = None,
+               x:             Optional[torch.Tensor] = None,
+               return_scores: bool = False,
               ):
         assert(not ((sample_size is None) and (x is None))), "Must specify either sample_size or x."
         
@@ -190,6 +197,8 @@ class NominalResponseModelSimulator(BaseFactorModelSimulator):
                            )
              """)
     
+        if return_scores:
+            return torch.from_numpy(ro.r["Y"]), torch.from_numpy(ro.r["Theta"])
         return torch.from_numpy(ro.r["Y"])
     
         
@@ -607,10 +616,11 @@ def get_params_and_data(model_type:      str,
                 sim_kwargs["residual_std"] = pydist.Uniform(0.6, 0.8).sample([_n_items])
                 
         if len(sim_kwargs["intercepts"].shape) > 1:
-#            F.pad(_ints_mask.unsqueeze(1), (n_cat - 2, M - n_cat), value = 1.)
-            sim_kwargs["intercepts"].mul_(torch.cat((_ints_mask.unsqueeze(1),
-                                                     torch.ones([_n_items, 
-                                                                 sim_kwargs["intercepts"].shape[1] - 1])), dim = 1))
+            zero_idxs = torch.stack(
+                (torch.arange(sim_kwargs["intercepts"].shape[0]),
+                 sim_kwargs["intercepts"].shape[1] - sim_kwargs["intercepts"].isnan().sum(dim = 1) - 1),
+                dim = 1)[_ints_mask == 0]
+            sim_kwargs["intercepts"][zero_idxs[:, 0], zero_idxs[:, 1]] = 0.
         else:
             sim_kwargs["intercepts"].mul_(_ints_mask)
         sims[u] = Simulators().SIMULATORS[u](**sim_kwargs)

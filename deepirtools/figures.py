@@ -205,11 +205,11 @@ def screeplot(latent_sizes:             List[int],
         Computing approx. LL
         Approx. LL computed in 2.37 seconds
         
-        [-8664.070281982422,
-         -8636.188293457031,
-         -8625.401916503906,
-         -8625.752655029297,
-         -8625.614959716797]
+        [-8626.66552734375,
+         -8601.913513183594,
+         -8603.8798828125,
+         -8604.689666748047,
+         -8603.455841064453]
     """
     
     assert(0 < test_size < 1), "Test size must be between 0 and 1."

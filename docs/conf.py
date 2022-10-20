@@ -94,7 +94,6 @@ latex_elements = {
 # Additional stuff for the LaTeX preamble.
 'preamble': r"""
 \usepackage{amsmath, amssymb}
-\usepackage{mathrsfs}
 \usepackage{bbold}
 """,
 }

@@ -48,11 +48,10 @@ def _recovery_args():
                    )
     return [[p for p in prod] for prod in prods if
             not ((prod[2] == 1 and prod[3] == "fixed_variances") or
-                 (prod[0] not in ("grm", "gpcm") and not prod[5]) or
+                 (prod[0] not in ("grm", "gpcm", "nominal") and not prod[5]) or
                  (prod[1] != "linear" and prod[3] == "free") or
                  (prod[1] == "linear" and prod[3] != "free") or
-                 (prod[1] == "none" and prod[4] != "fixed_means") or
-                 (prod[0] == "mixed" and prod[7] == False)
+                 (prod[1] == "none" and prod[4] != "fixed_means")
                 )
            ]
 
@@ -128,6 +127,10 @@ def test_param_recovery(model_type:      str,
     # Prepare parameters for comparison.
     if latent_size > 1 and est_params[1] is not None:
         est_params[1] = invert_cov(est_params[1], est_params[0])
+    if "gpcm" in res["model_types"] and len(est_params[2].shape) == 2:
+        if est_params[2].shape[1] > 1:
+            gpcm_idxs = torch.Tensor([i for i, m in enumerate(res["model_types"]) if m == "gpcm"]).long()
+            est_params[2][gpcm_idxs] = est_params[2][gpcm_idxs].cumsum(dim = 1)
     if mean_type == "free":
         est_params[2], true_params[2] = (est_params[2][true_params[2].eq(0).logical_not()],
                                          true_params[2][true_params[2].eq(0).logical_not()])
