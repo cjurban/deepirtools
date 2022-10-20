@@ -597,15 +597,14 @@ class IWAVE(BaseEstimator):
             batch = {k : v.to(self.device).float() if v is not None else v for k, v in batch.items()}
             
             if return_mu and iw_samples == 1:
-                if batch["covariates"] is not None:
-                    try:
-                        y = torch.cat((batch["y"], batch["covariates"]), dim = 1)
-                    except TypeError:
-                        if covariates is None:
-                            logging.exception("Covariates must be passed to scores() when covariate_size > 0.")
-                else:
+                try:
+                    y = torch.cat((batch["y"], batch["covariates"]), dim = 1)
+                except KeyError:
                     y = batch["y"]
-                scores.append(self.model.encode(y, mc_samples = 1, iw_samples = 1).squeeze((0, 1)))
+                except TypeError:
+                    if covariates is None:
+                        logging.exception("Covariates must be passed to scores() when covariate_size > 0.")
+                scores.append(self.model.encode(y, mc_samples = 1, iw_samples = 1)[0][0, 0])
             else:
                 elbo, x = self.model(**batch, mc_samples = mc_samples, iw_samples = iw_samples,
                                      **self.runtime_kwargs)
