@@ -170,10 +170,8 @@ class IWAVE(BaseEstimator):
     covariate_size : int, default = None
         Number of covariates for latent regression.
         
-        Only applicable when ``use_spline_prior = False``.
-        
-        Setting ``covariate_size > 0`` models the distribution of the latent factors
-        as:[3]_ [4]_
+        Setting ``covariate_size > 0`` when ``use_spline_prior = False`` models the
+        distribution of the latent factors as:[3]_ [4]_
         
         .. math::
             \boldsymbol{x} \mid \boldsymbol{z} \sim \mathcal{N}(\boldsymbol{\Gamma}^\top
@@ -240,6 +238,11 @@ class IWAVE(BaseEstimator):
         Number of segments for each spline transformation.
     bound : float, optional
         Quantity determining the bounding box of each spline transformation.
+    spline_net_sizes : list of int, optional
+        Hidden layer dimensions for neural network mapping from covariates to base density
+        for spline/spline coupling prior.
+        
+        Corresponds to a more flexible version of the latent regression model.
 
     Attributes
     __________
@@ -541,6 +544,7 @@ class IWAVE(BaseEstimator):
                covariates:   Optional[torch.Tensor] = None,
                mc_samples:   int = 1,
                iw_samples:   int = 5000,
+               return_mu:    bool = True,
               ):
         r"""Approximate expected a posteriori (EAP) factor scores given a data set.
         
@@ -568,7 +572,11 @@ class IWAVE(BaseEstimator):
             Increasing this decreases the EAP estimator's bias. When ``iw_samples > 1``, samples
             are drawn from the expected importance-weighted distribution using sampling-
             importance-resampling. [7]_
-        
+            
+        return_mu : bool, default = True
+            Whether to return exact approximate EAP scores (i.e., approximate EAP scores with no sampling error).
+            
+            Equivalent to using an infinite number of Monte Carlo samples. Only applicable when ``iw_samples = 1``.
         Returns
         _______
         factor_scores : Tensor
@@ -588,14 +596,25 @@ class IWAVE(BaseEstimator):
         for batch in loader:
             batch = {k : v.to(self.device).float() if v is not None else v for k, v in batch.items()}
             
-            elbo, x = self.model(**batch, mc_samples = mc_samples, iw_samples = iw_samples,
-                                 **self.runtime_kwargs)
-            w_tilda = (elbo - elbo.logsumexp(dim = 0)).exp()
-            latent_size = x.size(-1)
+            if return_mu and iw_samples == 1:
+                if batch["covariates"] is not None:
+                    try:
+                        y = torch.cat((batch["y"], batch["covariates"]), dim = 1)
+                    except TypeError:
+                        if covariates is None:
+                            logging.exception("Covariates must be passed to scores() when covariate_size > 0.")
+                else:
+                    y = batch["y"]
+                scores.append(self.model.encode(y, mc_samples = 1, iw_samples = 1).squeeze((0, 1)))
+            else:
+                elbo, x = self.model(**batch, mc_samples = mc_samples, iw_samples = iw_samples,
+                                     **self.runtime_kwargs)
+                w_tilda = (elbo - elbo.logsumexp(dim = 0)).exp()
+                latent_size = x.size(-1)
 
-            idxs = torch.distributions.Categorical(probs = w_tilda.permute([1, 2, 3, 0])).sample()
-            idxs = idxs.expand(x[-1, ...].shape).unsqueeze(0).long()
-            scores.append(torch.gather(x, axis = 0, index = idxs).squeeze(0).mean(dim = 0))                  
+                idxs = torch.distributions.Categorical(probs = w_tilda.permute([1, 2, 3, 0])).sample()
+                idxs = idxs.expand(x[-1, ...].shape).unsqueeze(0).long()
+                scores.append(torch.gather(x, axis = 0, index = idxs).squeeze(0).mean(dim = 0))                  
         return torch.cat(scores, dim = 0).cpu()
     
     @torch.no_grad()
