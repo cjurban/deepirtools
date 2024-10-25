@@ -451,7 +451,7 @@ class IWAVE(BaseEstimator):
 
         # IW-ELBO over batch.
         elif self.grad_estimator == "iwae":
-            elbo *= -1
+            elbo = elbo.mul(-1)
             iw_elbo = math.log(elbo.size(0)) - elbo.logsumexp(dim = 0)
                     
             if self.model.training:
@@ -461,7 +461,7 @@ class IWAVE(BaseEstimator):
 
         # IW-ELBO with DReG estimator over batch.
         elif self.grad_estimator == "dreg":
-            elbo *= -1
+            elbo = elbo.mul(-1)
             with torch.no_grad():
                 w_tilda = (elbo - elbo.logsumexp(dim = 0)).exp()
                 
